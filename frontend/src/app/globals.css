@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand-bg: #fdfbf6;
+  --color-brand-text: #2c2c2c;
+  --color-brand-primary: #bda871;
+  --color-brand-primary-hover: #a18e5b;
+  --color-brand-accent: #6c7a6c;
+  --color-brand-card: #ffffff;
+  --color-brand-border: #e6e4dc;
+
+  --font-serif: var(--font-playfair);
+  --font-sans: var(--font-inter);
+}
+
+:root {
+  --background: var(--color-brand-bg);
+  --foreground: var(--color-brand-text);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* Custom Utilities for elegant buttons */
+@layer components {
+  .btn-primary {
+    @apply bg-[var(--color-brand-primary)] text-white px-8 py-3 rounded hover:bg-[var(--color-brand-primary-hover)] transition-colors duration-300 font-medium;
+  }
+  .btn-outline {
+    @apply border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] px-8 py-3 rounded hover:bg-[var(--color-brand-primary)] hover:text-white transition-colors duration-300 font-medium;
+  }
+}
