@@ -8,7 +8,11 @@ const orderItemSchema = new mongoose.Schema({
   },
   name: { type: String, required: true },
   quantity: { type: Number, required: true, min: 1 },
-  price: { type: Number, required: true } // Price at the time of purchase
+  price: { type: Number, required: true }, // Price at the time of purchase
+  size: { type: String },
+  baseAmount: { type: Number, required: true },
+  gstAmount: { type: Number, required: true },
+  totalAmount: { type: Number, required: true }
 });
 
 const orderSchema = new mongoose.Schema({
@@ -19,6 +23,14 @@ const orderSchema = new mongoose.Schema({
   },
   items: [orderItemSchema],
   totalAmount: {
+    type: Number,
+    required: true
+  },
+  subtotal: {
+    type: Number,
+    required: true
+  },
+  gstAmount: {
     type: Number,
     required: true
   },

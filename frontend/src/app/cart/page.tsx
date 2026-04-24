@@ -6,6 +6,9 @@ import { Trash2, ArrowRight, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&q=80';
+const GST_RATE = 0.18;
+
+const roundToTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 export default function CartPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -36,7 +39,9 @@ export default function CartPage() {
     localStorage.setItem('cart', JSON.stringify(newItems));
   };
 
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const subtotal = roundToTwo(items.reduce((acc, item) => acc + (Number(item.price) * Number(item.quantity)), 0));
+  const gstAmount = roundToTwo(subtotal * GST_RATE);
+  const grandTotal = roundToTwo(subtotal + gstAmount);
 
   if (loading) return null;
 
@@ -69,8 +74,6 @@ export default function CartPage() {
         </div>
         
         <div className="flex flex-col lg:flex-row gap-16">
-          
-          {/* Left: Cart Items */}
           <div className="w-full lg:w-2/3 flex flex-col gap-8">
             {items.map((item, idx) => (
               <div key={`${item.id}-${item.size}-${idx}`} className="group flex gap-8 bg-white p-6 border border-gray-100 hover:shadow-md transition-all duration-500 relative">
@@ -117,8 +120,9 @@ export default function CartPage() {
                       >+</button>
                     </div>
                     <div className="text-right">
-                        <p className="text-xs text-gray-400 mb-1">Unit: ₹{item.price.toLocaleString('en-IN')}</p>
-                        <span className="text-xl font-medium text-gray-900">₹{(item.price * item.quantity).toLocaleString('en-IN')}</span>
+                        <p className="text-xs text-gray-400 mb-1">Unit: Rs. {Number(item.price).toLocaleString('en-IN')}</p>
+                        <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">GST: Rs. {roundToTwo(Number(item.price) * Number(item.quantity) * GST_RATE).toLocaleString('en-IN')}</p>
+                        <span className="text-xl font-medium text-gray-900">Rs. {roundToTwo(Number(item.price) * Number(item.quantity) * (1 + GST_RATE)).toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -132,7 +136,6 @@ export default function CartPage() {
             </div>
           </div>
 
-          {/* Right: Order Summary */}
           <div className="w-full lg:w-1/3">
             <div className="bg-white border border-gray-100 p-8 md:p-10 sticky top-28 shadow-sm">
               <h3 className="font-serif text-2xl mb-8 italic">Summary</h3>
@@ -140,7 +143,11 @@ export default function CartPage() {
               <div className="space-y-4 mb-8">
                 <div className="flex justify-between text-sm text-gray-500">
                     <span className="tracking-widest uppercase text-[10px] font-bold">Subtotal</span>
-                    <span className="font-medium">₹{subtotal.toLocaleString('en-IN')}</span>
+                    <span className="font-medium">Rs. {subtotal.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-500">
+                    <span className="tracking-widest uppercase text-[10px] font-bold">GST (18%)</span>
+                    <span className="font-medium">Rs. {gstAmount.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-500">
                     <span className="tracking-widest uppercase text-[10px] font-bold">Shipping (Delhivery)</span>
@@ -155,7 +162,7 @@ export default function CartPage() {
               <div className="border-t border-gray-100 pt-6 mb-8">
                 <div className="flex justify-between items-baseline">
                     <span className="font-serif text-xl">Grand Total</span>
-                    <span className="text-3xl font-medium text-[var(--color-brand-primary)]">₹{subtotal.toLocaleString('en-IN')}</span>
+                    <span className="text-3xl font-medium text-[var(--color-brand-primary)]">Rs. {grandTotal.toLocaleString('en-IN')}</span>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-2 tracking-widest uppercase font-bold text-right">Taxes included at checkout</p>
               </div>
@@ -172,7 +179,7 @@ export default function CartPage() {
                     <span>Secure multi-layer encryption</span>
                 </div>
                 <div className="bg-[#fdfbf6] p-4 rounded border border-[#f4ebd0] text-[10px] text-[#bda871] leading-relaxed uppercase tracking-wider font-bold">
-                    Note: Complimentary sample included with orders above ₹5,000
+                    Note: Complimentary sample included with orders above Rs. 5,000
                 </div>
               </div>
             </div>

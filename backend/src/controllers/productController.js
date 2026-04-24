@@ -1,3 +1,9 @@
+const Product = require('../models/Product');
+const MAX_SEARCH_KEYWORD_LENGTH = 120;
+
+const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
+const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 const MOCK_PRODUCTS = [
   {
     _id: "mock1",
@@ -42,11 +48,13 @@ const MOCK_PRODUCTS = [
 // @access  Public
 const getProducts = async (req, res) => {
   try {
-    // Simple query filtering (e.g., ?category=men)
-    const keyword = req.query.keyword
+    const safeKeyword = normalizeKeyword(req.query.keyword);
+
+    // Escape user input before regex to prevent invalid patterns and regex injection.
+    const keyword = safeKeyword
       ? {
           name: {
-            $regex: req.query.keyword,
+            $regex: escapeRegex(safeKeyword),
             $options: 'i', // case-insensitive
           },
         }

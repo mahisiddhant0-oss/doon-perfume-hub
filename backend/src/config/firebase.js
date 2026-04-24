@@ -1,26 +1,44 @@
 const path = require('path');
 const admin = require('firebase-admin');
+const { isProduction } = require('./env');
 
-// Ensure you have FIREBASE_SERVICE_ACCOUNT_KEY in your .env
-// This should be the absolute path to your firebase-adminsdk.json file
-// OR you can use environment variables to define the credentials directly
-// For development, we'll try initializing it if the credential exists.
+const getCredential = () => {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    return admin.credential.cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON));
+  }
 
-try {
   if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH) {
     const serviceAccountPath = path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_KEY_PATH);
     const serviceAccount = require(serviceAccountPath);
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
-    });
-    console.log('Firebase Admin Initialized Successfully');
-  } else {
-    // If not using a service account key file, fallback to default (assumes GOOGLE_APPLICATION_CREDENTIALS is set)
-    // Avoid crashing immediately so the rest of the app can boot, but auth will fail.
-    console.warn('WARNING: FIREBASE_SERVICE_ACCOUNT_KEY_PATH is not set in .env');
+    return admin.credential.cert(serviceAccount);
+  }
+
+  return null;
+};
+
+try {
+  if (!admin.apps.length) {
+    const credential = getCredential();
+
+    if (credential) {
+      admin.initializeApp({ credential });
+      console.log('Firebase Admin initialized successfully');
+    } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+      admin.initializeApp();
+      console.log('Firebase Admin initialized from GOOGLE_APPLICATION_CREDENTIALS');
+    } else if (isProduction) {
+      throw new Error(
+        'Firebase admin credentials are required in production. Set FIREBASE_SERVICE_ACCOUNT_JSON or GOOGLE_APPLICATION_CREDENTIALS.'
+      );
+    } else {
+      console.warn('Firebase Admin credentials not configured. Firebase auth will be unavailable.');
+    }
   }
 } catch (error) {
   console.error('Firebase Admin Initialization Error:', error.message);
+  if (isProduction) {
+    throw error;
+  }
 }
 
 module.exports = admin;

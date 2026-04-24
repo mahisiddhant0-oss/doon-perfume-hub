@@ -25,7 +25,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   font-family: var(--font-serif);
   font-weight: 500;
   letter-spacing: -0.02em;
@@ -36,6 +41,7 @@ h1, h2, h3, h4, h5, h6 {
   .btn-primary {
     @apply bg-[var(--color-brand-primary)] text-white px-8 py-3 rounded hover:bg-[var(--color-brand-primary-hover)] transition-colors duration-300 font-medium;
   }
+
   .btn-outline {
     @apply border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] px-8 py-3 rounded hover:bg-[var(--color-brand-primary)] hover:text-white transition-colors duration-300 font-medium;
   }

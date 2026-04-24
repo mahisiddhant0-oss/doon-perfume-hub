@@ -13,22 +13,38 @@ const Cart = require('../models/Cart');
  * @access  Public (Secret verification required)
  */
 const handleRazorpayWebhook = async (req, res) => {
-  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'your_webhook_secret';
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const signature = req.headers['x-razorpay-signature'];
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.rawBody || '');
 
-  // 1. Verify webhook signature for security
-  // req.rawBody is captured in server.js middleware
-  const expectedSignature = crypto
-    .createHmac('sha256', secret)
-    .update(req.rawBody)
-    .digest('hex');
+  if (!secret) {
+    return res.status(503).json({ message: 'Webhook secret is not configured' });
+  }
 
-  if (expectedSignature !== signature) {
-    console.warn('⚠️ Webhook signature mismatch');
+  if (!signature || rawBody.length === 0) {
+    return res.status(400).json({ message: 'Missing webhook signature or payload' });
+  }
+
+  const expectedSignature = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+
+  if (expectedSignature.length !== signature.length) {
     return res.status(400).json({ message: 'Invalid signature' });
   }
 
-  const { event, payload } = req.body;
+  if (!crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(signature))) {
+    console.warn('Webhook signature mismatch');
+    return res.status(400).json({ message: 'Invalid signature' });
+  }
+
+  let parsedBody;
+
+  try {
+    parsedBody = JSON.parse(rawBody.toString('utf8'));
+  } catch (error) {
+    return res.status(400).json({ message: 'Invalid webhook payload' });
+  }
+
+  const { event, payload } = parsedBody;
 
   if (event === 'payment.captured') {
     const paymentEntity = payload.payment.entity;
@@ -36,27 +52,23 @@ const handleRazorpayWebhook = async (req, res) => {
     const razorpayPaymentId = paymentEntity.id;
 
     try {
-      // 2. Find the payment record in our DB
       const payment = await Payment.findOne({ razorpay_order_id: razorpayOrderId });
       if (!payment) {
-        console.error('❌ Payment record not found for Order ID:', razorpayOrderId);
-        return res.status(200).json({ status: 'ok' }); // Return 200 to acknowledge receipt even if record missing
+        console.error('Payment record not found for Order ID:', razorpayOrderId);
+        return res.status(200).json({ status: 'ok' });
       }
 
-      // If already captured, skip to avoid duplicate processing
       if (payment.status === 'captured') {
         return res.status(200).json({ status: 'ok' });
       }
 
-      // 3. Update Payment record
       payment.razorpay_payment_id = razorpayPaymentId;
       payment.status = 'captured';
       await payment.save();
 
-      // 4. Update Order status (+ Populate User for email)
       const order = await Order.findById(payment.order).populate('user');
       if (!order) {
-        console.error('❌ Order not found for Payment ID:', payment._id);
+        console.error('Order not found for Payment ID:', payment._id);
         return res.status(200).json({ status: 'ok' });
       }
 
@@ -65,17 +77,14 @@ const handleRazorpayWebhook = async (req, res) => {
         order.orderStatus = 'processing';
         await order.save();
 
-        // 5. Stock reduction
         for (const item of order.items) {
-           await Product.findByIdAndUpdate(item.product, {
-             $inc: { stock: -item.quantity }
-           });
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: -item.quantity },
+          });
         }
 
-        // 6. Clear user cart
         await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
 
-        // 7. Trigger Logistics API
         try {
           const shipmentResult = await createShipment(order);
           if (shipmentResult?.awbNumber) {
@@ -83,35 +92,28 @@ const handleRazorpayWebhook = async (req, res) => {
             order.orderStatus = 'shipped';
             await order.save();
 
-            // New: Automated Pickup Request
             await schedulePickup(order);
           }
 
-          // New: Send Email Notifications
           await sendOrderConfirmation(order, order.user.email);
           await sendAdminNewOrderAlert(order);
-
-          // New: Send SMS Notifications (to the phone provided in shipping address)
           await sendOrderConfirmationSMS(order, order.shippingAddress.phone);
           if (order.awbNumber) {
             await sendShippingSMS(order, order.shippingAddress.phone);
           }
-
         } catch (logisticsError) {
-          console.error('❌ Logistics API failed during webhook processing:', logisticsError.message);
+          console.error('Logistics API failed during webhook processing:', logisticsError.message);
         }
       }
-
     } catch (error) {
-      console.error('❌ Error processing webhook event:', error.message);
+      console.error('Error processing webhook event:', error.message);
       return res.status(500).json({ message: 'Webhook processing error' });
     }
   }
 
-  // Acknowledge receipt of the webhook
   res.status(200).json({ status: 'ok' });
 };
 
 module.exports = {
-  handleRazorpayWebhook
+  handleRazorpayWebhook,
 };

@@ -1,20 +1,67 @@
+const crypto = require('crypto');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const Cart = require('../models/Cart');
+const Product = require('../models/Product');
 const razorpayInstance = require('../config/razorpay');
 const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
 const { sendOrderConfirmationSMS, sendShippingSMS } = require('../services/smsService');
-const crypto = require('crypto');
+
+const GST_RATE = 0.18;
+
+const roundToTwo = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+
+const calculateBilling = (items = []) => {
+  const normalizedItems = items.map((item) => {
+    const quantity = Number(item.quantity) || 0;
+    const price = Number(item.price) || 0;
+    const baseAmount = price * quantity;
+    const gstAmount = roundToTwo(baseAmount * GST_RATE);
+    const totalAmount = roundToTwo(baseAmount + gstAmount);
+
+    return {
+      product: item.id || item.product,
+      name: item.name,
+      quantity,
+      price,
+      baseAmount: roundToTwo(baseAmount),
+      gstAmount,
+      totalAmount,
+      size: item.size,
+    };
+  });
+
+  const subtotal = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.baseAmount, 0));
+  const gstAmount = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.gstAmount, 0));
+  const totalAmount = roundToTwo(subtotal + gstAmount);
+
+  return { normalizedItems, subtotal, gstAmount, totalAmount };
+};
+
+const ensureRazorpayConfigured = () => {
+  if (!razorpayInstance || !process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    const error = new Error('Payment gateway is not configured');
+    error.statusCode = 503;
+    throw error;
+  }
+};
+
+const buildReceiptId = (userId) => {
+  const userChunk = String(userId || '').slice(-8);
+  const timeChunk = Date.now().toString().slice(-10);
+  return `rcpt_${userChunk}_${timeChunk}`;
+};
 
 // @desc    Create new Order & corresponding Razorpay Order
 // @route   POST /api/orders
 // @access  Private
 const createOrder = async (req, res) => {
   try {
+    ensureRazorpayConfigured();
+
     const { shippingAddress, items: bodyItems } = req.body;
 
-    // Validate required address fields
     const required = ['firstName', 'lastName', 'street', 'city', 'state', 'pincode', 'phone'];
     for (const field of required) {
       if (!shippingAddress?.[field]) {
@@ -22,72 +69,77 @@ const createOrder = async (req, res) => {
       }
     }
 
-    // 1. Get Items: Either from body (Guest/LocalStorage) or from Database Cart
     let orderItems = [];
+    let subtotal = 0;
+    let gstAmount = 0;
     let totalAmount = 0;
 
     if (bodyItems && bodyItems.length > 0) {
-      // Use items from body
-      orderItems = bodyItems.map(item => ({
-        product: item.id || item.product,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-      }));
-      totalAmount = orderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+      const billing = calculateBilling(bodyItems);
+      orderItems = billing.normalizedItems;
+      subtotal = billing.subtotal;
+      gstAmount = billing.gstAmount;
+      totalAmount = billing.totalAmount;
     } else {
-      // Fetch user's cart from DB
       const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
       if (!cart || cart.items.length === 0) {
         return res.status(400).json({ message: 'Your cart is empty. Add items before placing an order.' });
       }
-      orderItems = cart.items.map(item => ({
-        product: item.product._id,
-        name: item.product.name,
-        quantity: item.quantity,
-        price: item.product.price,
-      }));
-      totalAmount = cart.items.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+      const billing = calculateBilling(
+        cart.items.map((item) => ({
+          id: item.product._id,
+          name: item.product.name,
+          quantity: item.quantity,
+          price: item.product.price,
+        }))
+      );
+      orderItems = billing.normalizedItems;
+      subtotal = billing.subtotal;
+      gstAmount = billing.gstAmount;
+      totalAmount = billing.totalAmount;
     }
 
-    // Create Razorpay Order (amount in paise)
     const razorpayOrder = await razorpayInstance.orders.create({
-      amount: totalAmount * 100,
+      amount: Math.round(totalAmount * 100),
       currency: 'INR',
-      receipt: `rcpt_${req.user._id}_${Date.now()}`
+      receipt: buildReceiptId(req.user._id),
     });
 
-    // Create MongoDB Order (Status: pending until payment confirmed)
     const newOrder = await Order.create({
       user: req.user._id,
       items: orderItems,
       totalAmount,
+      subtotal,
+      gstAmount,
       shippingAddress,
       orderStatus: 'pending',
-      paymentStatus: 'pending'
+      paymentStatus: 'pending',
     });
 
-    // Create Payment record linked to Razorpay Order ID
     await Payment.create({
       order: newOrder._id,
       user: req.user._id,
       razorpay_order_id: razorpayOrder.id,
       amount: totalAmount,
-      status: 'created'
+      status: 'created',
     });
 
-    // Return Razorpay credentials + order info to client to launch payment modal
     res.status(201).json({
       order: newOrder,
       razorpayOrderId: razorpayOrder.id,
       amount: razorpayOrder.amount,
       currency: razorpayOrder.currency,
-      key: process.env.RAZORPAY_KEY_ID
+      key: process.env.RAZORPAY_KEY_ID,
+      subtotal,
+      gstAmount,
     });
-
   } catch (error) {
     console.error('createOrder error:', error.message);
-    res.status(500).json({ message: 'Error creating order', error: error.message });
+    const message =
+      process.env.NODE_ENV === 'development'
+        ? error.message || 'Error creating order'
+        : 'Error creating order';
+    res.status(error.statusCode || 500).json({ message });
   }
 };
 
@@ -96,25 +148,24 @@ const createOrder = async (req, res) => {
 // @access  Private
 const verifyPayment = async (req, res) => {
   try {
+    ensureRazorpayConfigured();
+
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
       return res.status(400).json({ message: 'Missing payment verification details' });
     }
 
-    // Cryptographically verify the payment signature using HMAC-SHA256
     const body = `${razorpay_order_id}|${razorpay_payment_id}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'secret_placeholder')
-      .update(body)
-      .digest('hex');
+    const expectedSignature = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET).update(body).digest('hex');
 
-    const isAuthentic = expectedSignature === razorpay_signature;
+    if (expectedSignature.length !== razorpay_signature.length) {
+      return res.status(400).json({ message: 'Payment verification failed: invalid signature' });
+    }
+
+    const isAuthentic = crypto.timingSafeEqual(Buffer.from(expectedSignature), Buffer.from(razorpay_signature));
 
     if (isAuthentic) {
-      // --- PAYMENT SUCCESS ---
-
-      // 1. Update Payment record
       const payment = await Payment.findOne({ razorpay_order_id });
       if (!payment) {
         return res.status(404).json({ message: 'Payment record not found' });
@@ -124,28 +175,23 @@ const verifyPayment = async (req, res) => {
       payment.status = 'captured';
       await payment.save();
 
-      // 2. Update Order status to processing + mark as paid
       const order = await Order.findById(payment.order);
       order.paymentStatus = 'paid';
       order.orderStatus = 'processing';
       await order.save();
 
-      // 3. Clear user's cart (DB-side)
       await Cart.findOneAndUpdate({ user: req.user._id }, { items: [] });
 
-      // 4. Reduce Stock levels for each item
       try {
-        const Product = require('../models/Product');
         for (const item of order.items) {
-           await Product.findByIdAndUpdate(item.product, {
-             $inc: { stock: -item.quantity }
-           });
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: -item.quantity },
+          });
         }
       } catch (stockError) {
         console.error('Stock reduction failed:', stockError.message);
       }
 
-      // 5. Trigger Delhivery shipment creation (non-blocking)
       try {
         const shipmentResult = await createShipment(order);
         if (shipmentResult?.awbNumber) {
@@ -153,48 +199,40 @@ const verifyPayment = async (req, res) => {
           order.orderStatus = 'shipped';
           await order.save();
 
-          // New: Automated Pickup Request
           await schedulePickup(order);
         }
 
-        // New: Send Email Notifications
         await sendOrderConfirmation(order, req.user.email);
         await sendAdminNewOrderAlert(order);
-
-        // New: Send SMS Notifications (to the phone provided in shipping address)
         await sendOrderConfirmationSMS(order, order.shippingAddress.phone);
         if (order.awbNumber) {
           await sendShippingSMS(order, order.shippingAddress.phone);
         }
-
       } catch (logisticsError) {
         console.error('Delhivery AWB generation failed:', logisticsError.message);
       }
 
-      res.status(200).json({
+      return res.status(200).json({
         message: 'Payment verified successfully',
         orderId: order._id,
-        awbNumber: order.awbNumber || null
+        awbNumber: order.awbNumber || null,
       });
-
-    } else {
-      // --- PAYMENT FAILURE / SIGNATURE MISMATCH ---
-      const payment = await Payment.findOne({ razorpay_order_id });
-      if (payment) {
-        payment.status = 'failed';
-        await payment.save();
-        await Order.findByIdAndUpdate(payment.order, {
-          paymentStatus: 'failed',
-          orderStatus: 'cancelled'
-        });
-      }
-
-      res.status(400).json({ message: 'Payment verification failed: invalid signature' });
     }
 
+    const payment = await Payment.findOne({ razorpay_order_id });
+    if (payment) {
+      payment.status = 'failed';
+      await payment.save();
+      await Order.findByIdAndUpdate(payment.order, {
+        paymentStatus: 'failed',
+        orderStatus: 'cancelled',
+      });
+    }
+
+    return res.status(400).json({ message: 'Payment verification failed: invalid signature' });
   } catch (error) {
     console.error('verifyPayment error:', error.message);
-    res.status(500).json({ message: 'Error verifying payment', error: error.message });
+    res.status(error.statusCode || 500).json({ message: 'Error verifying payment' });
   }
 };
 
@@ -203,9 +241,7 @@ const verifyPayment = async (req, res) => {
 // @access  Private
 const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id })
-      .sort({ createdAt: -1 })
-      .populate('items.product', 'name images');
+    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).populate('items.product', 'name images');
 
     res.json(orders);
   } catch (error) {
@@ -224,8 +260,7 @@ const getOrderById = async (req, res) => {
       return res.status(404).json({ message: 'Order not found' });
     }
 
-    // Ensure user can only view their own orders (unless admin)
-    if (order.user.toString() !== req.user._id.toString() && !req.user.isAdmin) {
+    if (order.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to view this order' });
     }
 
@@ -279,5 +314,5 @@ module.exports = {
   getMyOrders,
   getOrderById,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
 };

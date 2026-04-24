@@ -48,7 +48,7 @@ export default function AdminDashboard() {
     <div className="space-y-8">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Revenue" value={`₹${stats.totalRevenue.toLocaleString()}`} icon={DollarSign} change="12.5" trend="up" />
+        <StatCard title="Total Revenue" value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`} icon={DollarSign} change="12.5" trend="up" />
         <StatCard title="Total Orders" value={stats.totalOrders} icon={ShoppingBag} change="8.2" trend="up" />
         <StatCard title="Total Customers" value={stats.totalUsers} icon={Users} change="5.4" trend="up" />
         <StatCard title="Conversion Rate" value={`${stats.conversionRate}%`} icon={TrendingUp} change="1.1" trend="down" />

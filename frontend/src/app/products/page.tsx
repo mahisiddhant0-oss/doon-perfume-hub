@@ -2,9 +2,11 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
-import { SlidersHorizontal, Search } from 'lucide-react';
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { SlidersHorizontal, Search, ShoppingBag, X } from 'lucide-react';
 import { API_ROUTES } from '@/lib/api';
+import MyAccountDropdown from '@/components/MyAccountDropdown';
 
 interface Variant {
   label: string;
@@ -22,14 +24,28 @@ interface Product {
   isActive: boolean;
 }
 
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  img?: string;
+  size?: string;
+  category?: string;
+}
+
 const CATEGORIES = [
   { label: 'All', value: '' },
   { label: 'Perfumes', value: 'perfumes' },
   { label: 'Essential Oils', value: 'essential-oils' },
   { label: 'Bottles', value: 'bottles' },
-  { label: 'Coloured Bottles', value: 'coloured-bottles' },
   { label: 'General', value: 'general' },
 ];
+
+const MAX_SEARCH_INPUT_LENGTH = 2000;
+const MAX_SEARCH_QUERY_LENGTH = 120;
+
+const normalizeSearchKeyword = (value = '') => value.trim().slice(0, MAX_SEARCH_QUERY_LENGTH);
 
 // Placeholder image if product has no image or Wix CDN URL
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&q=80';
@@ -43,27 +59,79 @@ function getProductImage(product: Product): string {
   return DEFAULT_IMAGE;
 }
 
-export default function ProductsPage() {
+function ProductsPageContent() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [search, setSearch] = useState('');
   const [priceFilter, setPriceFilter] = useState('');
+  const safeSearchKeyword = normalizeSearchKeyword(search);
+
+  useEffect(() => {
+    const categoryFromUrl = searchParams.get('category') || '';
+    const keywordFromUrl = searchParams.get('keyword') || '';
+
+    setSelectedCategory(categoryFromUrl);
+    setSearch(keywordFromUrl.slice(0, MAX_SEARCH_INPUT_LENGTH));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const loadCart = () => {
+      try {
+        const rawCart = localStorage.getItem('cart');
+        const parsed = rawCart ? JSON.parse(rawCart) : [];
+        setCartItems(Array.isArray(parsed) ? parsed : []);
+      } catch {
+        setCartItems([]);
+      }
+    };
+
+    loadCart();
+    window.addEventListener('storage', loadCart);
+
+    return () => {
+      window.removeEventListener('storage', loadCart);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
+      setError('');
       try {
         let url = API_ROUTES.PRODUCTS;
         const params = new URLSearchParams();
         if (selectedCategory) params.append('category', selectedCategory);
-        if (search) params.append('keyword', search);
+        if (safeSearchKeyword) params.append('keyword', safeSearchKeyword);
         if (params.toString()) url += `?${params.toString()}`;
 
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('Failed to fetch products');
-        const data: Product[] = await res.json();
+        // Retry transient fetch failures a few times to improve reliability in local dev.
+        let lastError: Error | null = null;
+        let payload: unknown = [];
+
+        for (let attempt = 1; attempt <= 3; attempt += 1) {
+          try {
+            const res = await fetch(url, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`Failed to fetch products (${res.status})`);
+            payload = await res.json();
+            lastError = null;
+            break;
+          } catch (attemptError: any) {
+            lastError = attemptError instanceof Error ? attemptError : new Error('Failed to fetch products');
+            if (attempt < 3) {
+              await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+            }
+          }
+        }
+
+        if (lastError) {
+          throw lastError;
+        }
+
+        const data: Product[] = Array.isArray(payload) ? payload : [];
 
         // Apply price filter client-side
         let filtered = data;
@@ -73,17 +141,114 @@ export default function ProductsPage() {
 
         setProducts(filtered);
       } catch (err: any) {
-        setError(err.message || 'Something went wrong');
+        setError(err?.message || 'Something went wrong');
       } finally {
         setLoading(false);
       }
     };
 
     fetchProducts();
-  }, [selectedCategory, search, priceFilter]);
+  }, [selectedCategory, safeSearchKeyword, priceFilter]);
+
+  const cartCount = cartItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const cartSubtotal = cartItems.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
+
+  const handleRemoveCartItem = (item: CartItem) => {
+    const updatedCart = cartItems.filter((existing) => !(existing.id === item.id && existing.size === item.size));
+    setCartItems(updatedCart);
+    localStorage.setItem('cart', JSON.stringify(updatedCart));
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div>
+      <header className="sticky top-0 z-50 bg-[#fdfbf6]/95 backdrop-blur-md border-b border-[#e6e4dc]">
+        <div className="bg-[#bda871] text-white text-xs text-center py-2 font-medium tracking-wide">
+          EXTRA 5% OFF | USE CODE: SCENTOFDOON | STORE LOCATOR
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            <Link href="/" className="font-serif text-3xl text-[var(--color-brand-primary)] tracking-tight">
+              doonperfume
+            </Link>
+
+            <nav className="hidden md:flex space-x-8 text-sm font-medium tracking-wider text-gray-700">
+              <Link href="/products" className="hover:text-[var(--color-brand-primary)] transition-colors">ALL</Link>
+              <Link href="/products?category=perfumes" className="hover:text-[var(--color-brand-primary)] transition-colors">PERFUMES</Link>
+              <Link href="/products?category=essential-oils" className="hover:text-[var(--color-brand-primary)] transition-colors">ESSENTIAL OILS</Link>
+              <Link href="/products?category=bottles" className="hover:text-[var(--color-brand-primary)] transition-colors">BOTTLES</Link>
+              <Link href="/products?category=general" className="hover:text-[var(--color-brand-primary)] transition-colors">GENERAL</Link>
+            </nav>
+
+            <div className="flex items-center gap-6">
+              <MyAccountDropdown />
+              <div className="relative group">
+              <Link href="/cart" className="hover:text-[var(--color-brand-primary)] relative text-gray-700">
+                <ShoppingBag size={22} strokeWidth={1.5} />
+                <span className="absolute -top-2 -right-2 bg-[var(--color-brand-primary)] text-white text-[10px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              </Link>
+
+              <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 mt-3 w-96 max-h-[420px] overflow-y-auto bg-white border border-[#e6e4dc] shadow-2xl p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-serif text-xl text-gray-900">Your Cart</h3>
+                  <span className="text-xs tracking-widest uppercase text-gray-400">{cartCount} Items</span>
+                </div>
+
+                {cartItems.length === 0 ? (
+                  <p className="text-sm text-gray-500 py-6 text-center">Your cart is empty.</p>
+                ) : (
+                  <>
+                    <div className="space-y-4">
+                      {cartItems.map((item, index) => (
+                        <div key={`${item.id}-${item.size || 'default'}-${index}`} className="flex gap-3 pb-4 border-b border-gray-100">
+                          <div className="relative w-16 h-20 bg-gray-50 border border-gray-100 flex-shrink-0">
+                            <Image
+                              src={item.img || DEFAULT_IMAGE}
+                              alt={item.name}
+                              fill
+                              className="object-cover"
+                              unoptimized
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] uppercase tracking-widest text-gray-400">{item.category?.replace('-', ' ') || 'fragrance'}</p>
+                            <h4 className="font-serif text-base text-gray-900 truncate">{item.name}</h4>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Qty: {item.quantity} {item.size ? `• ${item.size}` : ''}
+                            </p>
+                            <p className="text-sm font-semibold text-gray-800 mt-1">Rs. {(item.price * item.quantity).toLocaleString('en-IN')}</p>
+                          </div>
+                          <button
+                            onClick={() => handleRemoveCartItem(item)}
+                            className="text-gray-300 hover:text-red-500 transition-colors self-start"
+                            aria-label={`Remove ${item.name}`}
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="pt-4">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-xs uppercase tracking-widest text-gray-500">Subtotal</span>
+                        <span className="font-semibold text-gray-900">Rs. {cartSubtotal.toLocaleString('en-IN')}</span>
+                      </div>
+                      <Link href="/cart" className="block w-full text-center border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] py-2 text-xs tracking-widest font-semibold hover:bg-[var(--color-brand-primary)] hover:text-white transition-colors">
+                        VIEW CART
+                      </Link>
+                    </div>
+                  </>
+                )}
+              </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
 
       {/* Page Header */}
       <div className="text-center mb-10">
@@ -100,7 +265,7 @@ export default function ProductsPage() {
           type="text"
           placeholder="Search fragrances..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => setSearch(e.target.value.slice(0, MAX_SEARCH_INPUT_LENGTH))}
           className="w-full border border-gray-200 pl-11 pr-4 py-3 text-sm focus:outline-none focus:border-[var(--color-brand-primary)] bg-white"
         />
       </div>
@@ -235,6 +400,15 @@ export default function ProductsPage() {
           )}
         </div>
       </div>
+      </div>
     </div>
+  );
+}
+
+export default function ProductsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#fcfcfc]" />}>
+      <ProductsPageContent />
+    </Suspense>
   );
 }

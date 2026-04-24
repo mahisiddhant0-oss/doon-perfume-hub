@@ -4,8 +4,8 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const mongoSanitize = require('mongo-sanitize');
-const xss = require('xss-clean');
 const rateLimit = require('express-rate-limit');
+const { getAllowedOrigins, getPrimaryFrontendUrl, isProduction, validateEnv } = require('./config/env');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -16,17 +16,38 @@ const logisticsRoutes = require('./routes/logisticsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 
+validateEnv();
+
 const app = express();
+const allowedOrigins = getAllowedOrigins();
 
-// --- Global Security Middleware ---
-app.use(helmet()); // Set secure HTTP headers
-app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
-})); // Enable CORS with production safety
-app.use(xss()); // Prevent XSS attacks
+app.disable('x-powered-by');
 
-// Sanitize NoSQL Injection
+if (process.env.TRUST_PROXY === 'true' || isProduction) {
+  app.set('trust proxy', 1);
+}
+
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+    hsts: isProduction,
+  })
+);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error('Origin not allowed by CORS'));
+    },
+    credentials: true,
+  })
+);
+
 app.use((req, res, next) => {
   req.body = mongoSanitize(req.body);
   req.query = mongoSanitize(req.query);
@@ -34,54 +55,67 @@ app.use((req, res, next) => {
   next();
 });
 
-// Global Rate Limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again after 15 minutes'
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests from this IP, please try again after 15 minutes',
 });
 app.use('/api', limiter);
 
+app.get('/health', (req, res) => {
+  const mongoState = mongoose.connection?.readyState;
+  const dbStatus =
+    mongoState === 1 ? 'connected' : mongoState === 2 ? 'connecting' : mongoState === 3 ? 'disconnecting' : 'disconnected';
 
-// Middleware
-app.use(express.json({
-  verify: (req, res, buf) => {
-    req.rawBody = buf;
-  }
-}));
+  res.json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    frontendUrl: getPrimaryFrontendUrl() || null,
+    database: dbStatus,
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
 
-// Database Connection
+app.use('/api/webhooks', express.raw({ type: 'application/json', limit: '100kb' }), webhookRoutes);
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+
 const connectDB = async () => {
-    try {
-        const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/doonperfumehub');
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-        console.error(`Error connecting to MongoDB: ${error.message}`);
-        console.warn('WARNING: Running without MongoDB connection. Database features will fail.');
-        // process.exit(1); // Do not exit so the server can still run for other features/health checks
+  try {
+    const mongoUri = process.env.MONGO_URI || (!isProduction ? 'mongodb://127.0.0.1:27017/doonperfumehub' : null);
+
+    if (!mongoUri) {
+      throw new Error('MONGO_URI is required in production');
     }
+
+    const conn = await mongoose.connect(mongoUri);
+    console.log(`MongoDB Connected: ${conn.connection.host}`);
+  } catch (error) {
+    console.error(`Error connecting to MongoDB: ${error.message}`);
+    console.warn('WARNING: Running without MongoDB connection. Database features will fail.');
+  }
 };
 
 connectDB();
 
-// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/logistics', logisticsRoutes);
-app.use('/api/webhooks', webhookRoutes);
 
 app.get('/', (req, res) => {
-    res.send('API is running...');
+  res.send('API is running...');
 });
 
-// --- Final Middleware ---
-app.use(notFound); // Catch 404s
-app.use(errorHandler); // Global Error Handler
+app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

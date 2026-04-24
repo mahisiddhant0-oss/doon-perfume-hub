@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { API_ROUTES } from '@/lib/api';
-import { 
-  ShoppingBag, 
-  Search, 
-  Filter, 
-  ExternalLink, 
+import {
+  ShoppingBag,
+  Search,
+  Filter,
+  ExternalLink,
   RefreshCw,
   MoreVertical,
   CheckCircle,
@@ -15,32 +15,24 @@ import {
   AlertTriangle
 } from 'lucide-react';
 
+type AdminOrder = {
+  _id: string;
+  user: {
+    name: string;
+    email: string;
+  };
+  totalAmount: number;
+  orderStatus: string;
+  paymentStatus: string;
+  awbNumber?: string;
+  createdAt: string;
+};
+
 export default function AdminOrders() {
-  const [orders, setOrders] = useState([]);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Mock data for initial fill / fallback
-  const mockOrders = [
-    { 
-      _id: '64e9a1b2c3d4e5f6', 
-      user: { name: 'Mahish S.', email: 'mahish@example.com' }, 
-      totalAmount: 1240, 
-      orderStatus: 'processing', 
-      paymentStatus: 'paid',
-      awbNumber: 'DEL123456789',
-      createdAt: new Date().toISOString()
-    },
-    { 
-       _id: '64e9a1b2c3d4e5f7', 
-       user: { name: 'Ananya R.', email: 'ananya@example.com' }, 
-       totalAmount: 850, 
-       orderStatus: 'shipped', 
-       paymentStatus: 'paid',
-       awbNumber: 'DEL987654321',
-       createdAt: new Date(Date.now() - 3600000).toISOString()
-    }
-  ];
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -51,17 +43,17 @@ export default function AdminOrders() {
 
         const res = await fetch(API_ROUTES.ORDERS, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
 
         if (!res.ok) throw new Error('Failed to fetch orders');
-        const data = await res.json();
+        const data: AdminOrder[] = await res.json();
         setOrders(data);
       } catch (err) {
         console.error('Error fetching admin orders:', err);
-        // Fallback to mock for UI demonstration if DB empty/fails
-        setOrders(mockOrders);
+        setError('Unable to fetch orders. Please sign in with an admin account.');
+        setOrders([]);
       } finally {
         setIsLoading(false);
       }
@@ -70,8 +62,19 @@ export default function AdminOrders() {
     fetchOrders();
   }, []);
 
-  const StatusBadge = ({ status, type }: { status: string, type: 'order' | 'payment' }) => {
-    const colors: any = {
+  const filteredOrders = orders.filter((order) => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return true;
+
+    return (
+      order._id.toLowerCase().includes(query) ||
+      order.user.name.toLowerCase().includes(query) ||
+      order.user.email.toLowerCase().includes(query)
+    );
+  });
+
+  const StatusBadge = ({ status }: { status: string }) => {
+    const colors: Record<string, string> = {
       pending: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
       processing: 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20',
       shipped: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -80,7 +83,7 @@ export default function AdminOrders() {
       cancelled: 'bg-red-500/10 text-red-500 border-red-500/20',
       failed: 'bg-red-500/10 text-red-500 border-red-500/20',
     };
-    
+
     return (
       <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md border ${colors[status] || 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
         {status}
@@ -90,13 +93,12 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-6">
-      {/* Header & Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="relative flex-grow max-w-md group">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888] group-focus-within:text-[#D4AF37] transition-colors" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search by Order ID, Name or Email..." 
+          <input
+            type="text"
+            placeholder="Search by Order ID, Name or Email..."
             className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37] transition-all"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -114,7 +116,6 @@ export default function AdminOrders() {
         </div>
       </div>
 
-      {/* Orders Table */}
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -132,14 +133,20 @@ export default function AdminOrders() {
               {isLoading ? (
                 <tr>
                   <td colSpan={6} className="px-8 py-20 text-center text-[#888] font-serif tracking-widest uppercase">
-                    Loading Securly Processed Orders...
+                    Loading securely processed orders...
                   </td>
                 </tr>
-              ) : orders.map((order) => (
+              ) : error ? (
+                <tr>
+                  <td colSpan={6} className="px-8 py-20 text-center text-red-400 font-serif tracking-wide">
+                    {error}
+                  </td>
+                </tr>
+              ) : filteredOrders.map((order) => (
                 <tr key={order._id} className="hover:bg-white/[0.01] transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex flex-col">
-                      <span className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter">#{order._id.toString().toUpperCase()}</span>
+                      <span className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter">#{order._id.toUpperCase()}</span>
                       <span className="text-[#888] text-[10px] flex items-center">
                         <CreditCard size={10} className="mr-1" />
                         {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -154,24 +161,24 @@ export default function AdminOrders() {
                   </td>
                   <td className="px-6 py-6 space-y-2 flex flex-col items-start pt-5">
                     <div className="flex items-center space-x-2">
-                       <ShoppingBag size={12} className="text-[#888]" />
-                       <StatusBadge status={order.orderStatus} type="order" />
+                      <ShoppingBag size={12} className="text-[#888]" />
+                      <StatusBadge status={order.orderStatus} />
                     </div>
                     <div className="flex items-center space-x-2">
-                       <CreditCard size={12} className="text-[#888]" />
-                       <StatusBadge status={order.paymentStatus} type="payment" />
+                      <CreditCard size={12} className="text-[#888]" />
+                      <StatusBadge status={order.paymentStatus} />
                     </div>
                   </td>
                   <td className="px-6 py-6">
                     {order.awbNumber ? (
                       <div className="flex flex-col">
                         <span className="text-[#888] text-[10px] mb-1 flex items-center">
-                           <Truck size={12} className="text-blue-500 mr-2" />
-                           DELHIVERY (AWB)
+                          <Truck size={12} className="text-blue-500 mr-2" />
+                          DELHIVERY (AWB)
                         </span>
                         <div className="flex items-center space-x-2 group/awb">
-                           <span className="text-white text-xs font-mono">{order.awbNumber}</span>
-                           <ExternalLink size={12} className="text-[#888] cursor-pointer hover:text-[#D4AF37] transition-colors" />
+                          <span className="text-white text-xs font-mono">{order.awbNumber}</span>
+                          <ExternalLink size={12} className="text-[#888] cursor-pointer hover:text-[#D4AF37] transition-colors" />
                         </div>
                       </div>
                     ) : (
@@ -182,7 +189,7 @@ export default function AdminOrders() {
                     )}
                   </td>
                   <td className="px-6 py-6">
-                    <span className="text-white font-bold font-serif italic text-lg">₹{order.totalAmount}</span>
+                    <span className="text-white font-bold font-serif italic text-lg">Rs. {order.totalAmount}</span>
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end space-x-2">
@@ -200,10 +207,9 @@ export default function AdminOrders() {
           </table>
         </div>
       </div>
-      
-      {/* Footer Info */}
+
       <div className="flex justify-between items-center text-[#888] text-[10px] uppercase font-bold tracking-[0.2em] px-4">
-        <p>Showing {orders.length} orders of last 30 days</p>
+        <p>Showing {filteredOrders.length} orders of last 30 days</p>
         <p>DOON PERFUME HUB - Admin Terminal Access v1.0.4</p>
       </div>
     </div>

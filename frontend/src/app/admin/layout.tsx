@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { 
@@ -8,13 +8,9 @@ import {
   Package, 
   ShoppingBag, 
   Users, 
-  Settings, 
   LogOut, 
   Menu, 
   X,
-  TrendingUp,
-  DollarSign,
-  AlertCircle
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -23,29 +19,8 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const pathname = usePathname();
   const router = useRouter();
-
-  // Basic Admin Check (Client-side)
-  useEffect(() => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      if (user.role === 'admin') {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-        router.push('/');
-      }
-    } else {
-      setIsAdmin(false);
-      router.push('/');
-    }
-  }, [router]);
-
-  if (isAdmin === null) return <div className="min-h-screen bg-black flex items-center justify-center text-[#D4AF37]">Authenticating...</div>;
-  if (!isAdmin) return null;
 
   const navItems = [
     { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },

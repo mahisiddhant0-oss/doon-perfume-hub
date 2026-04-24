@@ -1,4 +1,18 @@
 const nodemailer = require('nodemailer');
+const emailNotificationsEnabled = String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
+
+const resolveFromAddress = (fallbackLabel = 'DOON PERFUME HUB') => {
+  const configured = String(process.env.SMTP_FROM_EMAIL || '').trim();
+  if (!configured) {
+    return fallbackLabel;
+  }
+
+  if (configured.includes('<') || configured.includes('@')) {
+    return configured;
+  }
+
+  return `"${fallbackLabel}" <${configured}>`;
+};
 
 // Setup SMTP transporter with environment variables
 const transporter = nodemailer.createTransport({
@@ -89,15 +103,20 @@ const getOrderEmailTemplate = (order, isAdmin = false) => {
  */
 const sendOrderConfirmation = async (order, userEmail) => {
   try {
+    if (!emailNotificationsEnabled) {
+      console.log('Email notifications disabled. Skipping customer confirmation email.');
+      return;
+    }
+
     if (!userEmail) {
       console.warn('⚠️ No user email found. Skipping order confirmation email.');
       return;
     }
 
     const mailOptions = {
-      from: `"DOON PERFUME HUB" <${process.env.SMTP_FROM_EMAIL}>`,
+      from: resolveFromAddress('DOON PERFUME HUB'),
       to: userEmail,
-      subject: `Order Recieved! #${order._id}`,
+      subject: `Order Received! #${order._id}`,
       html: getOrderEmailTemplate(order, false),
     };
 
@@ -113,6 +132,11 @@ const sendOrderConfirmation = async (order, userEmail) => {
  */
 const sendAdminNewOrderAlert = async (order) => {
   try {
+    if (!emailNotificationsEnabled) {
+      console.log('Email notifications disabled. Skipping admin order alert email.');
+      return;
+    }
+
     const adminEmail = process.env.ADMIN_EMAIL;
     if (!adminEmail) {
       console.warn('⚠️ ADMIN_EMAIL not set in .env. Skipping admin alert.');
@@ -120,7 +144,7 @@ const sendAdminNewOrderAlert = async (order) => {
     }
 
     const mailOptions = {
-      from: `"DOON PERFUME HUB LOGS" <${process.env.SMTP_FROM_EMAIL}>`,
+      from: resolveFromAddress('DOON PERFUME HUB LOGS'),
       to: adminEmail,
       subject: `🔥 NEW ORDER ALERT! #${order._id}`,
       html: getOrderEmailTemplate(order, true),

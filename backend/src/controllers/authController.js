@@ -1,13 +1,38 @@
 const admin = require('../config/firebase');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { getJwtSecret } = require('../config/env');
+const { sendOTPSMS } = require('../services/smsService');
 
 // Generate custom JWT (Backend Authorization)
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'fallback_secret_key', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };
+
+const OTP_TTL_MS = 10 * 60 * 1000;
+const MAX_OTP_ATTEMPTS = 5;
+
+const normalizePhone = (phone = '') => {
+  const cleaned = String(phone).replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+')) {
+    return cleaned;
+  }
+  if (/^\d{10}$/.test(cleaned)) {
+    return `+91${cleaned}`;
+  }
+  if (/^91\d{10}$/.test(cleaned)) {
+    return `+${cleaned}`;
+  }
+  return cleaned;
+};
+
+const hashOtp = (phone, otp) =>
+  crypto.createHash('sha256').update(`${phone}:${otp}:${getJwtSecret()}`).digest('hex');
+
+const createOtp = () => String(crypto.randomInt(100000, 1000000));
 
 // @desc    Auth user & get token (Login / Register via Firebase)
 // @route   POST /api/auth/firebase
@@ -20,6 +45,10 @@ const authWithFirebase = async (req, res) => {
   }
 
   try {
+    if (!admin.apps.length) {
+      return res.status(503).json({ message: 'Authentication service is not configured' });
+    }
+
     // Verify the Firebase ID token
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     
@@ -135,9 +164,116 @@ const getUsers = async (req, res) => {
   }
 };
 
+// @desc    Send OTP to mobile number
+// @route   POST /api/auth/otp/send
+// @access  Public
+const sendOtp = async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+
+    const otp = createOtp();
+    const otpCodeHash = hashOtp(phone, otp);
+    const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
+
+    let user = await User.findOne({ phone });
+
+    if (!user) {
+      user = await User.create({
+        name: name || `User_${phone.slice(-4)}`,
+        phone,
+        isVerified: false,
+        otpCodeHash,
+        otpExpiresAt,
+        otpAttempts: 0,
+      });
+    } else {
+      user.name = name || user.name;
+      user.otpCodeHash = otpCodeHash;
+      user.otpExpiresAt = otpExpiresAt;
+      user.otpAttempts = 0;
+      await user.save();
+    }
+
+    const smsResult = await sendOTPSMS(phone, otp);
+    if (smsResult?.error) {
+      return res.status(502).json({ message: `Failed to send OTP SMS: ${smsResult.error}` });
+    }
+
+    const payload = {
+      message: 'OTP sent successfully',
+      phone,
+    };
+
+    if (process.env.NODE_ENV !== 'production') {
+      payload.devOtp = otp;
+    }
+
+    res.json(payload);
+  } catch (error) {
+    console.error('sendOtp error:', error.message);
+    res.status(500).json({ message: 'Failed to send OTP' });
+  }
+};
+
+// @desc    Verify OTP and return auth token
+// @route   POST /api/auth/otp/verify
+// @access  Public
+const verifyOtpLogin = async (req, res) => {
+  try {
+    const phone = normalizePhone(req.body.phone);
+    const otp = String(req.body.otp || '').trim();
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found for this phone number' });
+    }
+
+    if (!user.otpCodeHash || !user.otpExpiresAt) {
+      return res.status(400).json({ message: 'No OTP request found. Please request OTP again.' });
+    }
+
+    if (user.otpExpiresAt.getTime() < Date.now()) {
+      return res.status(400).json({ message: 'OTP expired. Please request a new OTP.' });
+    }
+
+    if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({ message: 'Too many failed attempts. Please request a new OTP.' });
+    }
+
+    const expectedHash = hashOtp(phone, otp);
+    if (user.otpCodeHash !== expectedHash) {
+      user.otpAttempts += 1;
+      await user.save();
+      return res.status(400).json({ message: 'Invalid OTP. Please try again.' });
+    }
+
+    user.isVerified = true;
+    user.lastLoginAt = new Date();
+    user.otpCodeHash = undefined;
+    user.otpExpiresAt = undefined;
+    user.otpAttempts = 0;
+    await user.save();
+
+    return res.json({
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      token: generateToken(user._id),
+    });
+  } catch (error) {
+    console.error('verifyOtpLogin error:', error.message);
+    return res.status(500).json({ message: 'Failed to verify OTP' });
+  }
+};
+
 module.exports = {
   authWithFirebase,
   getUserProfile,
   updateUserProfile,
-  getUsers
+  getUsers,
+  sendOtp,
+  verifyOtpLogin,
 };

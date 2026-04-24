@@ -3,8 +3,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Star } from 'lucide-react';
+import { ArrowRight, Star, Search, Phone, ShoppingBag } from 'lucide-react';
 import { API_ROUTES } from '@/lib/api';
+import MyAccountDropdown from '@/components/MyAccountDropdown';
 
 interface Product {
   _id: string;
@@ -18,26 +19,36 @@ const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683
 
 export default function Home() {
   const [viralLaunches, setViralLaunches] = useState<Product[]>([]);
+  const [cartCount, setCartCount] = useState(0);
+  const [logoLoadError, setLogoLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
-  const categoriesCount = 16;
   const categories = [
     { name: 'New In', icon: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png', slug: '' },
-    { name: 'Attars', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'attars' },
     { name: 'Perfumes', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'perfumes' },
-    { name: 'Gifting', icon: 'https://cdn-icons-png.flaticon.com/512/2169/2169864.png', slug: 'essential-oils' },
+    { name: 'Essential Oils', icon: 'https://cdn-icons-png.flaticon.com/512/2169/2169864.png', slug: 'essential-oils' },
     { name: 'Bottles', icon: 'https://cdn-icons-png.flaticon.com/512/3062/3062294.png', slug: 'bottles' },
-    { name: 'Ouds', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'ouds' },
-    { name: 'Essential Oils', icon: 'https://cdn-icons-png.flaticon.com/512/3062/3062294.png', slug: 'essential-oils' },
-    { name: 'Samples', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'samples' },
-    { name: 'Signature', icon: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png', slug: 'signature' },
-    { name: 'Oudh Luxe', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'oudh' },
-    { name: 'Floral', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'floral' },
-    { name: 'Woody', icon: 'https://cdn-icons-png.flaticon.com/512/3062/3062294.png', slug: 'woody' },
-    { name: 'Musk', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'musk' },
-    { name: 'Spicy', icon: 'https://cdn-icons-png.flaticon.com/512/2169/2169864.png', slug: 'spicy' },
-    { name: 'Travel Kit', icon: 'https://cdn-icons-png.flaticon.com/512/3062/3062294.png', slug: 'travel' },
-    { name: 'Dehn Al Oud', icon: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png', slug: 'oud' },
+    { name: 'General', icon: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png', slug: 'general' },
   ];
+
+  useEffect(() => {
+    const loadCartCount = () => {
+      try {
+        const rawCart = localStorage.getItem('cart');
+        const parsed = rawCart ? JSON.parse(rawCart) : [];
+        const count = Array.isArray(parsed)
+          ? parsed.reduce((sum, item) => sum + (item.quantity || 0), 0)
+          : 0;
+        setCartCount(count);
+      } catch {
+        setCartCount(0);
+      }
+    };
+
+    loadCartCount();
+    window.addEventListener('storage', loadCartCount);
+
+    return () => window.removeEventListener('storage', loadCartCount);
+  }, []);
 
   useEffect(() => {
     const fetchViralProducts = async () => {
@@ -45,10 +56,11 @@ export default function Home() {
         const res = await fetch(API_ROUTES.PRODUCTS);
         if (!res.ok) throw new Error('API failed');
         const data = await res.json();
-        // Take latest 4 or shuffle
-        setViralLaunches(data.slice(0, 4));
+        const products = Array.isArray(data) ? data : [];
+        setViralLaunches(products.slice(0, 4));
       } catch (err) {
         console.error('Failed to fetch viral products:', err);
+        setViralLaunches([]);
       } finally {
         setLoading(false);
       }
@@ -58,6 +70,49 @@ export default function Home() {
 
   return (
     <div className="bg-[var(--color-brand-bg)]">
+      <header className="sticky top-0 z-50 bg-[#fdfbf6]/95 backdrop-blur-md border-b border-[#e6e4dc]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="h-20 flex items-center justify-between">
+            <Link href="/" className="flex items-center">
+              {!logoLoadError ? (
+                <Image
+                  src="/logo.png"
+                  alt="Doon Perfume Hub"
+                  width={220}
+                  height={60}
+                  className="h-12 w-auto object-contain"
+                  priority
+                  onError={() => setLogoLoadError(true)}
+                />
+              ) : (
+                <span className="font-serif text-3xl text-[var(--color-brand-primary)] tracking-tight">
+                  doonperfume
+                </span>
+              )}
+            </Link>
+
+            <nav className="flex items-center gap-6 text-sm font-medium tracking-wide text-gray-700">
+              <Link href="/products" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors">
+                <Search size={16} />
+                <span>Search</span>
+              </Link>
+              <MyAccountDropdown />
+              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors">
+                <Phone size={16} />
+                <span>Contact Us</span>
+              </a>
+              <Link href="/cart" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors relative pr-2">
+                <ShoppingBag size={16} />
+                <span>Cart</span>
+                <span className="absolute -top-2 -right-2 bg-[var(--color-brand-primary)] text-white text-[10px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              </Link>
+            </nav>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Banner */}
       <section className="relative w-full h-[70vh] md:h-[90vh] bg-black flex items-center overflow-hidden">
         <Image
@@ -93,7 +148,7 @@ export default function Home() {
             <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] text-gray-400 uppercase">Premium Selection</p>
           </div>
           
-          <div className="grid grid-cols-4 md:grid-cols-8 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
             {categories.map((cat, i) => (
               <Link href={`/products?category=${cat.slug}`} key={i} className="flex flex-col items-center group">
                 <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[#fdf8f4] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#f9eee4] group-hover:shadow-md group-hover:-translate-y-1">
@@ -188,9 +243,9 @@ export default function Home() {
          </div>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-4">
             {[
-              { name: 'Pure Attars', img: 'https://images.unsplash.com/photo-1627448839180-2647895400d3?w=800&q=80', slug: 'attars' },
-              { name: 'Oud Luxe', img: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800&q=80', slug: 'perfumes' },
-              { name: 'Glass Art', img: 'https://images.unsplash.com/photo-1547887537-6158d64c35e3?w=800&q=80', slug: 'bottles' },
+              { name: 'Perfumes', img: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800&q=80', slug: 'perfumes' },
+              { name: 'Essential Oils', img: 'https://images.unsplash.com/photo-1627448839180-2647895400d3?w=800&q=80', slug: 'essential-oils' },
+              { name: 'Glass Bottles', img: 'https://images.unsplash.com/photo-1547887537-6158d64c35e3?w=800&q=80', slug: 'bottles' },
             ].map((cat, i) => (
               <Link href={`/products?category=${cat.slug}`} key={i} className="group relative h-[500px] overflow-hidden flex items-end justify-center pb-12">
                  <Image src={cat.img} alt={cat.name} fill className="object-cover transition-transform duration-[3s] group-hover:scale-110" unoptimized />
