@@ -188,7 +188,12 @@ function ProductsPageContent() {
             </nav>
 
             <div className="flex items-center gap-6">
-              <MyAccountDropdown />
+              <div className="hidden sm:block">
+                <MyAccountDropdown />
+              </div>
+              <div className="sm:hidden">
+                <MyAccountDropdown compact />
+              </div>
               <div className="relative group">
               <Link href="/cart" className="hover:text-[var(--color-brand-primary)] relative text-gray-700">
                 <ShoppingBag size={22} strokeWidth={1.5} />

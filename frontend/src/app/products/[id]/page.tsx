@@ -222,7 +222,12 @@ export default function ProductDetails() {
                 strokeWidth={1.7}
                 className="cursor-pointer hover:text-[var(--color-brand-primary)]"
               />
-              <MyAccountDropdown />
+              <div className="hidden sm:block">
+                <MyAccountDropdown />
+              </div>
+              <div className="sm:hidden">
+                <MyAccountDropdown compact />
+              </div>
 
               <div className="relative group">
                 <Link

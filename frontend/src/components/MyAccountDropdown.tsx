@@ -26,7 +26,11 @@ const readErrorMessage = async (res: Response, fallback: string) => {
   return payload?.message || fallback;
 };
 
-export default function MyAccountDropdown() {
+type MyAccountDropdownProps = {
+  compact?: boolean;
+};
+
+export default function MyAccountDropdown({ compact = false }: MyAccountDropdownProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -132,7 +136,7 @@ export default function MyAccountDropdown() {
         aria-expanded={open}
       >
         <User size={16} />
-        <span>My Account</span>
+        {!compact && <span>My Account</span>}
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -144,7 +148,7 @@ export default function MyAccountDropdown() {
             animate="visible"
             exit="exit"
             transition={{ duration: 0.18 }}
-            className="absolute right-0 mt-3 w-[320px] bg-white border border-[#e6e4dc] shadow-xl p-4 z-[60]"
+            className="absolute right-0 mt-3 w-[min(320px,calc(100vw-1.5rem))] bg-white border border-[#e6e4dc] shadow-xl p-4 z-[60]"
           >
             {user ? (
               <>

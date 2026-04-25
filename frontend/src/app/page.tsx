@@ -68,35 +68,51 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="bg-[var(--color-brand-bg)]">
+    <div className="bg-[var(--color-brand-bg)] overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-[#fdfbf6]/95 backdrop-blur-md border-b border-[#e6e4dc]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="h-20 flex items-center justify-between">
+          <div className="h-16 md:h-20 flex items-center justify-between gap-2">
             <Link href="/" className="flex items-center">
               <Image
                 src="/DPH_LOGO.avif"
                 alt="Doon Perfume Hub"
                 width={220}
                 height={60}
-                className="h-12 w-auto object-contain"
+                className="h-10 md:h-12 w-auto object-contain"
                 priority
               />
             </Link>
 
-            <nav className="flex items-center gap-6 text-sm font-medium tracking-wide text-gray-700">
-              <Link href="/products" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors">
+            <nav className="hidden md:flex items-center gap-6 text-sm font-medium tracking-wide text-gray-700">
+              <Link href="/products" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors whitespace-nowrap">
                 <Search size={16} />
                 <span>Search</span>
               </Link>
               <MyAccountDropdown />
-              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors">
+              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors whitespace-nowrap">
                 <Phone size={16} />
                 <span>Contact Us</span>
               </a>
-              <Link href="/cart" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors relative pr-2">
+              <Link href="/cart" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors relative pr-2 whitespace-nowrap">
                 <ShoppingBag size={16} />
                 <span>Cart</span>
                 <span className="absolute -top-2 -right-2 bg-[var(--color-brand-primary)] text-white text-[10px] min-w-5 h-5 px-1 rounded-full flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              </Link>
+            </nav>
+
+            <nav className="flex md:hidden items-center gap-3 text-gray-700">
+              <Link href="/products" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors" aria-label="Search">
+                <Search size={18} />
+              </Link>
+              <MyAccountDropdown compact />
+              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors" aria-label="Contact Us">
+                <Phone size={18} />
+              </a>
+              <Link href="/cart" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors relative" aria-label="Cart">
+                <ShoppingBag size={18} />
+                <span className="absolute -top-1 -right-1 bg-[var(--color-brand-primary)] text-white text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
                   {cartCount}
                 </span>
               </Link>
@@ -116,9 +132,9 @@ export default function Home() {
           unoptimized
         />
         <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
-        <div className="absolute inset-0 flex flex-col justify-center items-end text-right px-8 md:px-24 z-10 max-w-7xl mx-auto">
+        <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-6 md:px-24 z-10 max-w-7xl mx-auto">
           <p className="text-[#bda871] font-bold tracking-[0.3em] text-xs md:text-sm mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
-          <h1 className="text-white font-serif text-5xl md:text-8xl mb-6 leading-tight drop-shadow-2xl">
+          <h1 className="text-white font-serif text-4xl md:text-8xl mb-6 leading-tight drop-shadow-2xl">
             A Scent Full Of <br /><span className="italic text-[#f4ebd0]">Elegance</span>
           </h1>
           <p className="text-gray-300 max-w-md text-sm md:text-lg mb-10 leading-relaxed font-light">
