@@ -178,11 +178,15 @@ export default function ProductDetails() {
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <Link
-              href="/"
-              className="font-serif text-3xl text-[var(--color-brand-primary)] tracking-tight"
-            >
-              doonperfume
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/DPH_LOGO.avif"
+                alt="Doon Perfume Hub"
+                width={160}
+                height={60}
+                className="h-10 w-auto object-contain"
+                priority
+              />
             </Link>
 
             <nav className="hidden md:flex space-x-8 text-sm font-medium tracking-wider text-gray-700">

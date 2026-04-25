@@ -20,7 +20,6 @@ const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683
 export default function Home() {
   const [viralLaunches, setViralLaunches] = useState<Product[]>([]);
   const [cartCount, setCartCount] = useState(0);
-  const [logoLoadError, setLogoLoadError] = useState(false);
   const [loading, setLoading] = useState(true);
   const categories = [
     { name: 'New In', icon: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png', slug: '' },
@@ -74,21 +73,14 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="h-20 flex items-center justify-between">
             <Link href="/" className="flex items-center">
-              {!logoLoadError ? (
-                <Image
-                  src="/logo.png"
-                  alt="Doon Perfume Hub"
-                  width={220}
-                  height={60}
-                  className="h-12 w-auto object-contain"
-                  priority
-                  onError={() => setLogoLoadError(true)}
-                />
-              ) : (
-                <span className="font-serif text-3xl text-[var(--color-brand-primary)] tracking-tight">
-                  doonperfume
-                </span>
-              )}
+              <Image
+                src="/DPH_LOGO.avif"
+                alt="Doon Perfume Hub"
+                width={220}
+                height={60}
+                className="h-12 w-auto object-contain"
+                priority
+              />
             </Link>
 
             <nav className="flex items-center gap-6 text-sm font-medium tracking-wide text-gray-700">

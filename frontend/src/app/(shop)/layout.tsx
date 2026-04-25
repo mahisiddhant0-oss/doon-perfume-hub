@@ -1,4 +1,5 @@
 import { Search, ShoppingBag, User, Heart } from "lucide-react";
+import Image from "next/image";
 import Link from 'next/link';
 
 const Navbar = () => (
@@ -13,8 +14,15 @@ const Navbar = () => (
         
         {/* Logo */}
         <div className="flex-shrink-0 flex items-center">
-          <Link href="/" className="font-serif text-3xl text-[var(--color-brand-primary)] tracking-tight">
-            doonperfume
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/DPH_LOGO.avif"
+              alt="Doon Perfume Hub"
+              width={140}
+              height={56}
+              className="h-10 w-auto object-contain"
+              priority
+            />
           </Link>
         </div>
 
@@ -49,7 +57,15 @@ const Footer = () => (
   <footer className="bg-white border-t border-[var(--color-brand-border)] pt-16 pb-8 mt-24">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-4 gap-12">
       <div>
-        <h3 className="font-serif text-2xl text-[var(--color-brand-primary)] mb-6">doonperfume</h3>
+        <Link href="/" className="inline-flex items-center mb-6">
+          <Image
+            src="/DPH_LOGO.avif"
+            alt="Doon Perfume Hub"
+            width={150}
+            height={60}
+            className="h-10 w-auto object-contain"
+          />
+        </Link>
         <p className="text-gray-500 text-sm leading-relaxed mb-6">
           Crafting memories through exquisite scents. Doon Perfume Hub curates the finest luxury fragrances and artisan attars.
         </p>

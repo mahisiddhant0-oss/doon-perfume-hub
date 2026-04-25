@@ -144,7 +144,16 @@ export default function CheckoutPage() {
           <Link href="/cart" className="flex items-center text-sm font-medium text-gray-500 hover:text-[var(--color-brand-primary)]">
             <ChevronLeft size={16} className="mr-1" /> RETURN TO CART
           </Link>
-          <div className="font-serif text-2xl text-[var(--color-brand-primary)]">doonperfume</div>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/DPH_LOGO.avif"
+              alt="Doon Perfume Hub"
+              width={150}
+              height={56}
+              className="h-10 w-auto object-contain"
+              priority
+            />
+          </Link>
           <div className="flex items-center text-sm font-medium text-gray-500">
             <Lock size={16} className="mr-2" /> SECURE CHECKOUT
           </div>
