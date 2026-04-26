@@ -10,6 +10,8 @@ const normalizeWeightKg = (value) => {
   }
   return parsed;
 };
+
+const normalizeSku = (value = '') => String(value || '').trim();
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 
 const normalizeCategories = (category, categories) => {
@@ -174,17 +176,18 @@ const createProduct = async (req, res) => {
   try {
     const { name, description, price, sku, category, categories, stock, images, attributes, weightKg, variants } = req.body;
     const normalizedCategories = normalizeCategories(category, categories);
+    const normalizedSku = normalizeSku(sku);
 
-    const productExists = await Product.findOne({ sku });
+    const productExists = await Product.findOne({ sku: normalizedSku });
     if (productExists) {
         return res.status(400).json({ message: 'Product with this SKU already exists' });
     }
 
     const product = new Product({
-      name,
+      name: String(name || '').trim(),
       description,
       price,
-      sku,
+      sku: normalizedSku,
       category: normalizedCategories[0],
       categories: normalizedCategories,
       stock,
@@ -197,6 +200,12 @@ const createProduct = async (req, res) => {
     const createdProduct = await product.save();
     res.status(201).json(createdProduct);
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({ message: 'Product with this SKU already exists' });
+    }
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation failed while creating product', error: error.message });
+    }
     res.status(500).json({ message: 'Server Error creating product', error: error.message });
   }
 };
@@ -211,10 +220,10 @@ const updateProduct = async (req, res) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
-      product.name = name || product.name;
+      product.name = name !== undefined ? String(name || '').trim() : product.name;
       product.description = description || product.description;
       product.price = price !== undefined ? price : product.price;
-      product.sku = sku || product.sku;
+      product.sku = sku !== undefined ? normalizeSku(sku) : product.sku;
       if (category !== undefined || categories !== undefined) {
         const normalizedCategories = normalizeCategories(
           category !== undefined ? category : product.category,
@@ -238,6 +247,12 @@ const updateProduct = async (req, res) => {
       res.status(404).json({ message: 'Product not found' });
     }
   } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(400).json({ message: 'Product with this SKU already exists' });
+    }
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({ message: 'Validation failed while updating product', error: error.message });
+    }
     res.status(500).json({ message: 'Server Error updating product', error: error.message });
   }
 };

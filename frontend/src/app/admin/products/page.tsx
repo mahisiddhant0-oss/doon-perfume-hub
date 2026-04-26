@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMemo } from 'react';
 import { API_ROUTES } from '@/lib/api';
 import {
@@ -11,7 +11,8 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   XCircle,
-  Layers
+  Layers,
+  ChevronDown
 } from 'lucide-react';
 
 type AdminProduct = {
@@ -56,12 +57,12 @@ type ProductForm = {
 
 const CATEGORY_OPTIONS = [
   { value: 'perfumes', label: 'Perfumes' },
-  { value: 'attars', label: 'Attars' },
-  { value: 'ouds', label: 'Ouds' },
   { value: 'essential-oils', label: 'Essential Oils' },
   { value: 'bottles', label: 'Glass Bottles' },
 ];
+const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const CUSTOM_CATEGORY_VALUE = '__custom_category__';
+const ADMIN_CUSTOM_CATEGORY_POOL_KEY = 'admin_custom_category_pool_v1';
 
 const emptyForm: ProductForm = {
   name: '',
@@ -77,20 +78,44 @@ const emptyForm: ProductForm = {
 };
 
 export default function AdminProducts() {
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
   const [formData, setFormData] = useState<ProductForm>(emptyForm);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isCreatingCustomCategory, setIsCreatingCustomCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState('');
+  const [customCategoryPool, setCustomCategoryPool] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
+
+  const mergeCategoryValues = (...inputs: Array<string[] | undefined>) => {
+    const seen = new Set<string>();
+    const merged: string[] = [];
+
+    for (const source of inputs) {
+      if (!Array.isArray(source)) continue;
+      for (const rawEntry of source) {
+        const entry = String(rawEntry || '').trim();
+        const normalized = entry.toLowerCase();
+        if (!entry || EXCLUDED_CATEGORY_VALUES.has(normalized) || seen.has(normalized)) continue;
+        seen.add(normalized);
+        merged.push(entry);
+      }
+    }
+
+    return merged;
+  };
 
   const fetchProducts = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(API_ROUTES.PRODUCTS);
+      const separator = API_ROUTES.PRODUCTS.includes('?') ? '&' : '?';
+      const res = await fetch(`${API_ROUTES.PRODUCTS}${separator}_ts=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) throw new Error('Failed to fetch');
       const data: AdminProduct[] = await res.json();
       setProducts(data);
@@ -105,11 +130,71 @@ export default function AdminProducts() {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const rawStored = window.localStorage.getItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY);
+    if (!rawStored) return;
+
+    try {
+      const parsed = JSON.parse(rawStored);
+      if (Array.isArray(parsed)) {
+        setCustomCategoryPool(mergeCategoryValues(parsed as string[]));
+      }
+    } catch {
+      window.localStorage.removeItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (!categoryDropdownRef.current) return;
+      if (!categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  useEffect(() => {
+    const categoriesFromProducts = products
+      .flatMap((product) => {
+        if (Array.isArray(product.categories) && product.categories.length > 0) {
+          return product.categories.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        return [String(product.category || '').trim()].filter(Boolean);
+      })
+      .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
+
+    setCustomCategoryPool((prevPool) => {
+      const nextPool = mergeCategoryValues(prevPool, categoriesFromProducts);
+      const changed =
+        nextPool.length !== prevPool.length ||
+        nextPool.some((entry, index) => entry !== prevPool[index]);
+
+      if (changed && typeof window !== 'undefined') {
+        window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
+      }
+
+      return changed ? nextPool : prevPool;
+    });
+  }, [products]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(customCategoryPool));
+  }, [customCategoryPool]);
+
   const handleOpenModal = (product: AdminProduct | null = null) => {
     if (product) {
       const normalizedCategories = Array.isArray(product.categories) && product.categories.length > 0
         ? product.categories.map((entry) => String(entry || '').trim()).filter(Boolean)
         : [String(product.category || '').trim()].filter(Boolean);
+      const sanitizedCategories = normalizedCategories.filter(
+        (entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase())
+      );
 
       setEditingProduct(product);
       setFormData({
@@ -126,16 +211,18 @@ export default function AdminProducts() {
               weight: Number(variant.weight || 0),
             }))
           : [],
-        category: normalizedCategories[0] || 'perfumes',
-        categories: normalizedCategories.length > 0 ? normalizedCategories : ['perfumes'],
+        category: sanitizedCategories[0] || 'perfumes',
+        categories: sanitizedCategories.length > 0 ? sanitizedCategories : ['perfumes'],
         description: product.description || '',
         images: product.images || []
       });
+      setIsCategoryDropdownOpen(false);
       setIsCreatingCustomCategory(false);
       setCustomCategoryInput('');
     } else {
       setEditingProduct(null);
       setFormData(emptyForm);
+      setIsCategoryDropdownOpen(false);
       setIsCreatingCustomCategory(false);
       setCustomCategoryInput('');
     }
@@ -147,6 +234,12 @@ export default function AdminProducts() {
     try {
       const url = editingProduct ? `${API_ROUTES.PRODUCTS}/${editingProduct._id}` : API_ROUTES.PRODUCTS;
       const method = editingProduct ? 'PUT' : 'POST';
+      const normalizedCategoriesForSave = mergeCategoryValues(
+        formData.categories,
+        customCategoryInput ? [customCategoryInput] : []
+      );
+      const finalCategories = normalizedCategoriesForSave.length > 0 ? normalizedCategoriesForSave : ['general'];
+      setCustomCategoryPool((prevPool) => mergeCategoryValues(prevPool, finalCategories));
 
       const userStr = localStorage.getItem('user');
       const token = userStr ? JSON.parse(userStr).token : '';
@@ -159,18 +252,44 @@ export default function AdminProducts() {
         },
         body: JSON.stringify({
           ...formData,
-          category: formData.categories[0] || formData.category || 'perfumes',
-          categories: formData.categories,
+          category: finalCategories[0] || formData.category || 'perfumes',
+          categories: finalCategories,
           variants: formData.variants.filter((variant) => variant.label.trim().length > 0),
         })
       });
 
       if (res.ok) {
+        const savedProduct = await res.json().catch(() => null);
+        const categoriesFromSavedProduct = mergeCategoryValues(
+          Array.isArray(savedProduct?.categories) ? savedProduct.categories : [],
+          savedProduct?.category ? [savedProduct.category] : [],
+          finalCategories
+        );
+        const nextPool = mergeCategoryValues(customCategoryPool, categoriesFromSavedProduct);
+        setCustomCategoryPool(nextPool);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
+        }
+
+        // Keep UI in sync instantly for both Create and Edit flows.
+        if (savedProduct?._id) {
+          setProducts((prev) => {
+            const exists = prev.some((item) => item._id === savedProduct._id);
+            if (exists) {
+              return prev.map((item) => (item._id === savedProduct._id ? savedProduct : item));
+            }
+            return [savedProduct, ...prev];
+          });
+        }
+
         setIsModalOpen(false);
+        setIsCreatingCustomCategory(false);
+        setCustomCategoryInput('');
         fetchProducts();
       } else {
         const errData = await res.json();
-        alert(errData.message || 'Error saving product');
+        const detailedMessage = [errData?.message, errData?.error].filter(Boolean).join(': ');
+        alert(detailedMessage || 'Error saving product');
       }
     } catch (err) {
       console.error('Save error:', err);
@@ -268,20 +387,23 @@ export default function AdminProducts() {
         }
         return [String(product.category || '').trim()].filter(Boolean);
       })
+      .filter((category) => !EXCLUDED_CATEGORY_VALUES.has(category.toLowerCase()))
       .filter((category) => !defaultValues.has(category.toLowerCase()));
 
-    return Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b));
-  }, [products]);
+    return mergeCategoryValues(categories, customCategoryPool)
+      .filter((category) => !defaultValues.has(category.toLowerCase()))
+      .sort((a, b) => a.localeCompare(b));
+  }, [products, customCategoryPool]);
 
   const allCategoryOptions = useMemo(
     () =>
-      Array.from(
-        new Set([
-          ...CATEGORY_OPTIONS.map((option) => option.value),
-          ...customCategoryOptions,
-        ])
+      mergeCategoryValues(
+        CATEGORY_OPTIONS.map((option) => option.value),
+        customCategoryOptions,
+        customCategoryPool,
+        formData.categories
       ),
-    [customCategoryOptions]
+    [customCategoryOptions, customCategoryPool, formData.categories]
   );
 
   const addCustomCategoryToForm = () => {
@@ -290,18 +412,51 @@ export default function AdminProducts() {
       return;
     }
 
+    const nextPool = mergeCategoryValues(customCategoryPool, [typedCategory]);
+    setCustomCategoryPool(nextPool);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
+    }
+
     setFormData((prev) => {
-      if (prev.categories.some((entry) => entry.toLowerCase() === typedCategory.toLowerCase())) {
+      const nextCategories = mergeCategoryValues(prev.categories, [typedCategory]);
+      if (nextCategories.length === prev.categories.length) {
         return prev;
       }
       return {
         ...prev,
-        category: prev.categories[0] || typedCategory,
-        categories: [...prev.categories, typedCategory],
+        category: nextCategories[0] || typedCategory,
+        categories: nextCategories,
       };
     });
     setCustomCategoryInput('');
     setIsCreatingCustomCategory(false);
+  };
+
+  const toggleCategorySelection = (categoryValue: string) => {
+    setFormData((prev) => {
+      const exists = prev.categories.some((entry) => entry.toLowerCase() === categoryValue.toLowerCase());
+      if (exists) {
+        if (prev.categories.length === 1) {
+          return prev;
+        }
+        const nextCategories = prev.categories.filter(
+          (entry) => entry.toLowerCase() !== categoryValue.toLowerCase()
+        );
+        return {
+          ...prev,
+          categories: nextCategories,
+          category: nextCategories[0] || 'perfumes',
+        };
+      }
+
+      const nextCategories = [...prev.categories, categoryValue];
+      return {
+        ...prev,
+        categories: nextCategories,
+        category: nextCategories[0] || prev.category || 'perfumes',
+      };
+    });
   };
 
   return (
@@ -450,7 +605,7 @@ export default function AdminProducts() {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] w-full max-w-2xl rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
             <div className="p-6 border-b border-[#1a1a1a] flex justify-between items-center">
               <h2 className="text-xl font-serif text-[#D4AF37]">{editingProduct ? 'Edit Fragrance' : 'Add New Fragrance'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-[#888] hover:text-white transition-colors"><XCircle size={24} /></button>
@@ -516,41 +671,67 @@ export default function AdminProducts() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Category</label>
-                  <select
-                    multiple
-                    value={formData.categories}
-                    onChange={(e) => {
-                      const selectedValues = Array.from(e.target.selectedOptions).map((option) => option.value);
-                      if (selectedValues.includes(CUSTOM_CATEGORY_VALUE)) {
-                        setIsCreatingCustomCategory(true);
-                      }
+                  <div className="relative" ref={categoryDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                      className="w-full bg-black border border-[#1a1a1a] px-3 py-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none flex items-center justify-between text-left"
+                    >
+                      <span className="truncate">
+                        {formData.categories.length > 0 ? formData.categories.join(', ') : 'Select category'}
+                      </span>
+                      <ChevronDown
+                        size={16}
+                        className={`text-[#888] transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
-                      const nextCategories = selectedValues.filter((value) => value !== CUSTOM_CATEGORY_VALUE);
-                      if (nextCategories.length === 0) {
-                        setFormData({ ...formData, categories: [formData.categories[0] || 'perfumes'], category: formData.category || 'perfumes' });
-                        return;
-                      }
-
-                      setFormData({
-                        ...formData,
-                        categories: nextCategories,
-                        category: nextCategories[0],
-                      });
-                    }}
-                    className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none min-h-[130px]"
-                  >
-                    {allCategoryOptions.map((categoryValue) => (
-                      <option key={categoryValue} value={categoryValue}>
-                        {categoryValue}
-                      </option>
-                    ))}
-                    <option value={CUSTOM_CATEGORY_VALUE}>Create Custom Category</option>
-                  </select>
-                  <p className="text-[10px] text-[#666] uppercase tracking-wide">
-                    Hold Ctrl/Cmd to select multiple categories
-                  </p>
+                    {isCategoryDropdownOpen ? (
+                      <div className="absolute top-full left-0 right-0 mt-2 bg-black border border-[#1a1a1a] rounded-lg z-30 overflow-hidden shadow-2xl">
+                        <div className="max-h-52 overflow-y-auto">
+                          {allCategoryOptions.map((categoryValue) => {
+                            const isSelected = formData.categories.some(
+                              (entry) => entry.toLowerCase() === categoryValue.toLowerCase()
+                            );
+                            return (
+                              <button
+                                type="button"
+                                key={categoryValue}
+                                onClick={() => toggleCategorySelection(categoryValue)}
+                                className="w-full px-3 py-2 text-left text-sm hover:bg-[#111] flex items-center justify-between"
+                              >
+                                <span>{categoryValue}</span>
+                                <span
+                                  className={`w-4 h-4 rounded border ${
+                                    isSelected ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-[#444]'
+                                  }`}
+                                />
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsCreatingCustomCategory(true);
+                            setIsCategoryDropdownOpen(false);
+                          }}
+                          className="w-full px-3 py-2 text-left text-sm border-t border-[#1a1a1a] text-[#D4AF37] hover:bg-[#111]"
+                        >
+                          Create Custom Category
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                   {isCreatingCustomCategory ? (
-                    <div className="flex gap-2">
+                    <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-2">
+                      <button
+                        type="button"
+                        onClick={addCustomCategoryToForm}
+                        className="h-full px-3 py-3 text-xs font-bold uppercase tracking-widest rounded-lg bg-[#D4AF37] text-black hover:bg-[#bda871] whitespace-nowrap"
+                      >
+                        Add
+                      </button>
                       <input
                         required
                         type="text"
@@ -559,13 +740,6 @@ export default function AdminProducts() {
                         onChange={(e) => setCustomCategoryInput(e.target.value)}
                         className="flex-1 bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
                       />
-                      <button
-                        type="button"
-                        onClick={addCustomCategoryToForm}
-                        className="px-4 py-3 text-xs font-bold uppercase tracking-widest rounded-lg bg-[#D4AF37] text-black hover:bg-[#bda871]"
-                      >
-                        Add
-                      </button>
                     </div>
                   ) : null}
                 </div>
