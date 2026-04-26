@@ -1,7 +1,9 @@
 const admin = require('../config/firebase');
 const User = require('../models/User');
+const BlockedCredential = require('../models/BlockedCredential');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const { getJwtSecret } = require('../config/env');
 const { sendLoginOtpEmail } = require('../services/emailService');
 
@@ -51,6 +53,11 @@ const isPermanentAdminEmail = (email = '') => {
   return normalizedEmail ? getPermanentAdminEmails().has(normalizedEmail) : false;
 };
 
+const isPermanentAdminUser = (user) => {
+  const email = normalizeEmail(user?.email);
+  return email ? isPermanentAdminEmail(email) : false;
+};
+
 const syncUserRoleFromAllowlist = (user) => {
   if (isPermanentAdminEmail(user?.email)) {
     if (user.role !== 'admin') {
@@ -69,6 +76,20 @@ const hashOtp = (email, otp) =>
   crypto.createHash('sha256').update(`${email}:${otp}:${getJwtSecret()}`).digest('hex');
 
 const createOtp = () => String(crypto.randomInt(100000, 1000000));
+
+const getBlockedCredentialMatch = async ({ email, phone }) => {
+  const values = [normalizeEmail(email), normalizePhone(phone)].filter(Boolean);
+  if (values.length === 0) return null;
+  return BlockedCredential.findOne({ value: { $in: values } });
+};
+
+const denyIfCredentialBlocked = async (res, { email, phone }) => {
+  const blocked = await getBlockedCredentialMatch({ email, phone });
+  if (!blocked) return null;
+
+  res.status(403).json({ message: 'Access denied. Your account is restricted.' });
+  return blocked;
+};
 
 // @desc    Auth user & get token (Login / Register via Firebase)
 // @route   POST /api/auth/firebase
@@ -98,6 +119,9 @@ const authWithFirebase = async (req, res) => {
       return res.status(400).json({ message: 'Invalid payload from Firebase: Missing email and phone number' });
     }
 
+    const denied = await denyIfCredentialBlocked(res, { email, phone });
+    if (denied) return;
+
     // Try to find an existing user in our MongoDB by phone OR email
     let user = null;
     if (phone) {
@@ -115,6 +139,10 @@ const authWithFirebase = async (req, res) => {
         email,
         isVerified: true
       });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Your account is blocked. Please contact support.' });
     }
 
     syncUserRoleFromAllowlist(user);
@@ -212,6 +240,9 @@ const sendOtp = async (req, res) => {
     const email = normalizeEmail(req.body.email);
     const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
 
+    const denied = await denyIfCredentialBlocked(res, { email, phone });
+    if (denied) return;
+
     const otp = createOtp();
     const otpCodeHash = hashOtp(email, otp);
     const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
@@ -255,6 +286,10 @@ const sendOtp = async (req, res) => {
       await user.save();
     }
 
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Your account is blocked. Please contact support.' });
+    }
+
     const emailResult = await sendLoginOtpEmail({ email, otp, name: user.name });
     if (emailResult?.error) {
       return res.status(502).json({ message: `Failed to send OTP email: ${emailResult.error}` });
@@ -282,9 +317,16 @@ const verifyOtpLogin = async (req, res) => {
     const email = normalizeEmail(req.body.email);
     const otp = String(req.body.otp || '').trim();
 
+    const denied = await denyIfCredentialBlocked(res, { email, phone });
+    if (denied) return;
+
     const user = await User.findOne({ email, phone });
     if (!user) {
       return res.status(404).json({ message: 'No user found for this email and phone combination' });
+    }
+
+    if (user.isBlocked) {
+      return res.status(403).json({ message: 'Your account is blocked. Please contact support.' });
     }
 
     if (!user.otpCodeHash || !user.otpExpiresAt) {
@@ -367,6 +409,118 @@ const elevateAdminAccess = async (req, res) => {
   }
 };
 
+// @desc    Block/unblock user (Admin only)
+// @route   PATCH /api/auth/:userId/block
+// @access  Private/Admin
+const setUserBlockStatus = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (isPermanentAdminUser(targetUser)) {
+      return res.status(403).json({ message: 'Permanent admin users cannot be blocked.' });
+    }
+
+    const shouldBlock =
+      typeof req.body?.isBlocked === 'boolean' ? req.body.isBlocked : !Boolean(targetUser.isBlocked);
+
+    targetUser.isBlocked = shouldBlock;
+    if (shouldBlock) {
+      targetUser.blockedAt = new Date();
+      targetUser.blockedBy = req.user?._id;
+      targetUser.blockReason = typeof req.body?.reason === 'string' ? req.body.reason.trim().slice(0, 250) : '';
+      targetUser.otpCodeHash = undefined;
+      targetUser.otpExpiresAt = undefined;
+      targetUser.otpAttempts = 0;
+    } else {
+      targetUser.blockedAt = undefined;
+      targetUser.blockedBy = undefined;
+      targetUser.blockReason = '';
+    }
+
+    syncUserRoleFromAllowlist(targetUser);
+    const updatedUser = await targetUser.save();
+
+    return res.json({
+      message: updatedUser.isBlocked ? 'User blocked successfully' : 'User unblocked successfully',
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error('setUserBlockStatus error:', error.message);
+    return res.status(500).json({ message: 'Failed to update block status' });
+  }
+};
+
+// @desc    Delete user permanently (Admin only)
+// @route   DELETE /api/auth/:userId
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+      return res.status(400).json({ message: 'Invalid user id' });
+    }
+
+    const targetUser = await User.findById(req.params.userId);
+    if (!targetUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (isPermanentAdminUser(targetUser)) {
+      return res.status(403).json({ message: 'Permanent admin users cannot be deleted.' });
+    }
+
+    const blockOps = [];
+    if (targetUser.email) {
+      blockOps.push(
+        BlockedCredential.updateOne(
+          { value: normalizeEmail(targetUser.email) },
+          {
+            $set: {
+              type: 'email',
+              value: normalizeEmail(targetUser.email),
+              reason: 'deleted_by_admin',
+              sourceUserId: targetUser._id,
+            },
+          },
+          { upsert: true }
+        )
+      );
+    }
+    if (targetUser.phone) {
+      blockOps.push(
+        BlockedCredential.updateOne(
+          { value: normalizePhone(targetUser.phone) },
+          {
+            $set: {
+              type: 'phone',
+              value: normalizePhone(targetUser.phone),
+              reason: 'deleted_by_admin',
+              sourceUserId: targetUser._id,
+            },
+          },
+          { upsert: true }
+        )
+      );
+    }
+
+    if (blockOps.length > 0) {
+      await Promise.all(blockOps);
+    }
+
+    await User.deleteOne({ _id: targetUser._id });
+    return res.json({ message: 'User deleted permanently and credentials blocked' });
+  } catch (error) {
+    console.error('deleteUser error:', error.message);
+    return res.status(500).json({ message: 'Failed to delete user' });
+  }
+};
+
 module.exports = {
   authWithFirebase,
   getUserProfile,
@@ -375,4 +529,6 @@ module.exports = {
   sendOtp,
   verifyOtpLogin,
   elevateAdminAccess,
+  setUserBlockStatus,
+  deleteUser,
 };

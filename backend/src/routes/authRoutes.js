@@ -1,6 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { authWithFirebase, getUserProfile, updateUserProfile, getUsers, sendOtp, verifyOtpLogin, elevateAdminAccess } = require('../controllers/authController');
+const {
+  authWithFirebase,
+  getUserProfile,
+  updateUserProfile,
+  getUsers,
+  sendOtp,
+  verifyOtpLogin,
+  elevateAdminAccess,
+  setUserBlockStatus,
+  deleteUser,
+} = require('../controllers/authController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { authValidation, otpSendValidation, otpVerifyValidation } = require('../middlewares/validationMiddleware');
 
@@ -16,5 +26,7 @@ router.post('/admin/elevate', protect, elevateAdminAccess);
 
 // Admin-only: List all registered users
 router.get('/', protect, adminRights, getUsers);
+router.patch('/:userId/block', protect, adminRights, setUserBlockStatus);
+router.delete('/:userId', protect, adminRights, deleteUser);
 
 module.exports = router;

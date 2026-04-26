@@ -49,6 +49,22 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  isBlocked: {
+    type: Boolean,
+    default: false
+  },
+  blockedAt: {
+    type: Date
+  },
+  blockedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  blockReason: {
+    type: String,
+    trim: true,
+    maxlength: 250
+  },
   lastLoginAt: {
     type: Date
   }

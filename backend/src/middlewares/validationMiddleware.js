@@ -51,7 +51,21 @@ const otpVerifyValidation = [
 const productValidation = [
   body('name').trim().isLength({ min: 2, max: 120 }).withMessage('Product name must be between 2 and 120 characters'),
   body('price').isNumeric().withMessage('Price must be a number').custom((v) => v >= 0).withMessage('Price cannot be negative'),
-  body('category').trim().notEmpty().withMessage('Category is required'),
+  body('category').optional().trim().isLength({ min: 1, max: 80 }).withMessage('Category must be between 1 and 80 characters'),
+  body('categories').optional().isArray({ min: 1 }).withMessage('Categories must be a non-empty array'),
+  body('categories.*').optional().trim().isLength({ min: 1, max: 80 }).withMessage('Each category must be between 1 and 80 characters'),
+  body().custom((payload) => {
+    const hasCategory = typeof payload?.category === 'string' && payload.category.trim().length > 0;
+    const hasCategories =
+      Array.isArray(payload?.categories) &&
+      payload.categories.some((entry) => String(entry || '').trim().length > 0);
+
+    if (!hasCategory && !hasCategories) {
+      throw new Error('At least one category is required');
+    }
+
+    return true;
+  }),
   body('sku').trim().notEmpty().withMessage('SKU is required').isLength({ min: 3, max: 64 }).withMessage('SKU must be between 3 and 64 characters'),
   body('stock').optional().isNumeric().withMessage('Stock must be a number'),
   body('weightKg').optional().isNumeric().withMessage('Weight must be a number').custom((v) => v >= 0).withMessage('Weight cannot be negative'),

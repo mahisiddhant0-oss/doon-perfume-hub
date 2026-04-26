@@ -11,6 +11,17 @@ const normalizeWeightKg = (value) => {
   return parsed;
 };
 
+const normalizeCategories = (category, categories) => {
+  const fromArray = Array.isArray(categories)
+    ? categories.map((entry) => String(entry || '').trim())
+    : [];
+  const fromPrimary = String(category || '').trim();
+
+  const merged = [...fromArray, fromPrimary].filter(Boolean);
+  const uniqueCategories = Array.from(new Set(merged));
+  return uniqueCategories.length > 0 ? uniqueCategories : ['general'];
+};
+
 const normalizeVariants = (variants = []) => {
   if (!Array.isArray(variants)) {
     return [];
@@ -44,6 +55,7 @@ const MOCK_PRODUCTS = [
     description: "Our signature artisanal fragrance with notes of amber and spice.",
     price: 120,
     category: "perfumes",
+    categories: ["perfumes"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80"]
   },
@@ -53,6 +65,7 @@ const MOCK_PRODUCTS = [
     description: "Premium pure oud extract from the finest aged agarwood.",
     price: 250,
     category: "ouds",
+    categories: ["ouds"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1583445013765-46c20c4a6772?w=800&q=80"]
   },
@@ -62,6 +75,7 @@ const MOCK_PRODUCTS = [
     description: "A fresh bouquet of jasmine and rose in a concentrated oil base.",
     price: 85,
     category: "essential-oils",
+    categories: ["essential-oils"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1512909006721-3d6018887383?w=800&q=80"]
   },
@@ -71,6 +85,7 @@ const MOCK_PRODUCTS = [
     description: "Warm, long-lasting musk that develops uniquely on every skin.",
     price: 150,
     category: "attars",
+    categories: ["attars"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=800&q=80"]
   }
@@ -93,7 +108,20 @@ const getProducts = async (req, res) => {
         }
       : {};
 
-    const categoryFilter = req.query.category ? { category: req.query.category } : {};
+    const requestedCategories = String(req.query.category || '')
+      .split(',')
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean);
+
+    const categoryFilter =
+      requestedCategories.length > 0
+        ? {
+            $or: [
+              { category: { $in: requestedCategories } },
+              { categories: { $in: requestedCategories } },
+            ],
+          }
+        : {};
 
     // For public, we might only want to show active products
     const products = await Product.find({ ...keyword, ...categoryFilter, isActive: true });
@@ -131,7 +159,8 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes, weightKg, variants } = req.body;
+    const { name, description, price, sku, category, categories, stock, images, attributes, weightKg, variants } = req.body;
+    const normalizedCategories = normalizeCategories(category, categories);
 
     const productExists = await Product.findOne({ sku });
     if (productExists) {
@@ -143,7 +172,8 @@ const createProduct = async (req, res) => {
       description,
       price,
       sku,
-      category,
+      category: normalizedCategories[0],
+      categories: normalizedCategories,
       stock,
       weightKg: normalizeWeightKg(weightKg),
       images,
@@ -163,7 +193,7 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes, isActive, weightKg, variants } = req.body;
+    const { name, description, price, sku, category, categories, stock, images, attributes, isActive, weightKg, variants } = req.body;
 
     const product = await Product.findById(req.params.id);
 
@@ -172,7 +202,14 @@ const updateProduct = async (req, res) => {
       product.description = description || product.description;
       product.price = price !== undefined ? price : product.price;
       product.sku = sku || product.sku;
-      product.category = category || product.category;
+      if (category !== undefined || categories !== undefined) {
+        const normalizedCategories = normalizeCategories(
+          category !== undefined ? category : product.category,
+          categories !== undefined ? categories : product.categories
+        );
+        product.category = normalizedCategories[0];
+        product.categories = normalizedCategories;
+      }
       product.stock = stock !== undefined ? stock : product.stock;
       product.weightKg = weightKg !== undefined ? normalizeWeightKg(weightKg) : product.weightKg;
       

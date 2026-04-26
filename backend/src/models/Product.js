@@ -33,6 +33,11 @@ const productSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  categories: {
+    type: [String],
+    default: [],
+    index: true
+  },
   stock: {
     type: Number,
     default: 100,
@@ -50,5 +55,25 @@ const productSchema = new mongoose.Schema({
     default: true
   }
 }, { timestamps: true });
+
+productSchema.pre('validate', function syncCategoryFields(next) {
+  const normalizedCategories = Array.isArray(this.categories)
+    ? this.categories
+        .map((entry) => String(entry || '').trim())
+        .filter(Boolean)
+    : [];
+
+  const uniqueCategories = Array.from(new Set(normalizedCategories));
+  const normalizedPrimary = String(this.category || '').trim();
+
+  if (uniqueCategories.length === 0 && normalizedPrimary) {
+    uniqueCategories.push(normalizedPrimary);
+  }
+
+  this.categories = uniqueCategories;
+  this.category = uniqueCategories[0] || normalizedPrimary || 'general';
+
+  next();
+});
 
 module.exports = mongoose.model('Product', productSchema);

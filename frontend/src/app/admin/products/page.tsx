@@ -28,6 +28,7 @@ type AdminProduct = {
     weight: number;
   }[];
   category: string;
+  categories?: string[];
   description?: string;
   images?: string[];
   isActive?: boolean;
@@ -48,9 +49,19 @@ type ProductForm = {
   weightKg: number;
   variants: VariantForm[];
   category: string;
+  categories: string[];
   description: string;
   images: string[];
 };
+
+const CATEGORY_OPTIONS = [
+  { value: 'perfumes', label: 'Perfumes' },
+  { value: 'attars', label: 'Attars' },
+  { value: 'ouds', label: 'Ouds' },
+  { value: 'essential-oils', label: 'Essential Oils' },
+  { value: 'bottles', label: 'Glass Bottles' },
+];
+const CUSTOM_CATEGORY_VALUE = '__custom_category__';
 
 const emptyForm: ProductForm = {
   name: '',
@@ -60,6 +71,7 @@ const emptyForm: ProductForm = {
   weightKg: 0,
   variants: [],
   category: 'perfumes',
+  categories: ['perfumes'],
   description: '',
   images: []
 };
@@ -70,6 +82,8 @@ export default function AdminProducts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
   const [formData, setFormData] = useState<ProductForm>(emptyForm);
+  const [isCreatingCustomCategory, setIsCreatingCustomCategory] = useState(false);
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
 
@@ -93,6 +107,10 @@ export default function AdminProducts() {
 
   const handleOpenModal = (product: AdminProduct | null = null) => {
     if (product) {
+      const normalizedCategories = Array.isArray(product.categories) && product.categories.length > 0
+        ? product.categories.map((entry) => String(entry || '').trim()).filter(Boolean)
+        : [String(product.category || '').trim()].filter(Boolean);
+
       setEditingProduct(product);
       setFormData({
         name: product.name,
@@ -108,13 +126,18 @@ export default function AdminProducts() {
               weight: Number(variant.weight || 0),
             }))
           : [],
-        category: product.category,
+        category: normalizedCategories[0] || 'perfumes',
+        categories: normalizedCategories.length > 0 ? normalizedCategories : ['perfumes'],
         description: product.description || '',
         images: product.images || []
       });
+      setIsCreatingCustomCategory(false);
+      setCustomCategoryInput('');
     } else {
       setEditingProduct(null);
       setFormData(emptyForm);
+      setIsCreatingCustomCategory(false);
+      setCustomCategoryInput('');
     }
     setIsModalOpen(true);
   };
@@ -136,6 +159,8 @@ export default function AdminProducts() {
         },
         body: JSON.stringify({
           ...formData,
+          category: formData.categories[0] || formData.category || 'perfumes',
+          categories: formData.categories,
           variants: formData.variants.filter((variant) => variant.label.trim().length > 0),
         })
       });
@@ -218,8 +243,10 @@ export default function AdminProducts() {
       result = result.filter((product) => {
         const name = product.name?.toLowerCase() || '';
         const sku = product.sku?.toLowerCase() || '';
-        const category = product.category?.toLowerCase() || '';
-        return name.includes(query) || sku.includes(query) || category.includes(query);
+        const categories = Array.isArray(product.categories) && product.categories.length > 0
+          ? product.categories.join(' ').toLowerCase()
+          : (product.category?.toLowerCase() || '');
+        return name.includes(query) || sku.includes(query) || categories.includes(query);
       });
     }
 
@@ -231,6 +258,51 @@ export default function AdminProducts() {
 
     return result;
   }, [products, searchTerm, sortBy]);
+
+  const customCategoryOptions = useMemo(() => {
+    const defaultValues = new Set(CATEGORY_OPTIONS.map((option) => option.value.toLowerCase()));
+    const categories = products
+      .flatMap((product) => {
+        if (Array.isArray(product.categories) && product.categories.length > 0) {
+          return product.categories.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        return [String(product.category || '').trim()].filter(Boolean);
+      })
+      .filter((category) => !defaultValues.has(category.toLowerCase()));
+
+    return Array.from(new Set(categories)).sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
+  const allCategoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...CATEGORY_OPTIONS.map((option) => option.value),
+          ...customCategoryOptions,
+        ])
+      ),
+    [customCategoryOptions]
+  );
+
+  const addCustomCategoryToForm = () => {
+    const typedCategory = customCategoryInput.trim();
+    if (!typedCategory) {
+      return;
+    }
+
+    setFormData((prev) => {
+      if (prev.categories.some((entry) => entry.toLowerCase() === typedCategory.toLowerCase())) {
+        return prev;
+      }
+      return {
+        ...prev,
+        category: prev.categories[0] || typedCategory,
+        categories: [...prev.categories, typedCategory],
+      };
+    });
+    setCustomCategoryInput('');
+    setIsCreatingCustomCategory(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -302,7 +374,12 @@ export default function AdminProducts() {
                 <td className="px-6 py-6">
                   <div className="flex items-center space-x-2 text-[#888] text-xs uppercase font-medium">
                     <Layers size={14} className="text-[#444]" />
-                    <span>{product.category}</span>
+                    <span>
+                      {(Array.isArray(product.categories) && product.categories.length > 0
+                        ? product.categories
+                        : [product.category]
+                      ).join(', ')}
+                    </span>
                   </div>
                 </td>
                 <td className="px-6 py-6">
@@ -440,16 +517,57 @@ export default function AdminProducts() {
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Category</label>
                   <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                    multiple
+                    value={formData.categories}
+                    onChange={(e) => {
+                      const selectedValues = Array.from(e.target.selectedOptions).map((option) => option.value);
+                      if (selectedValues.includes(CUSTOM_CATEGORY_VALUE)) {
+                        setIsCreatingCustomCategory(true);
+                      }
+
+                      const nextCategories = selectedValues.filter((value) => value !== CUSTOM_CATEGORY_VALUE);
+                      if (nextCategories.length === 0) {
+                        setFormData({ ...formData, categories: [formData.categories[0] || 'perfumes'], category: formData.category || 'perfumes' });
+                        return;
+                      }
+
+                      setFormData({
+                        ...formData,
+                        categories: nextCategories,
+                        category: nextCategories[0],
+                      });
+                    }}
+                    className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none min-h-[130px]"
                   >
-                    <option value="perfumes">Perfumes</option>
-                    <option value="attars">Attars</option>
-                    <option value="ouds">Ouds</option>
-                    <option value="essential-oils">Essential Oils</option>
-                    <option value="bottles">Glass Bottles</option>
+                    {allCategoryOptions.map((categoryValue) => (
+                      <option key={categoryValue} value={categoryValue}>
+                        {categoryValue}
+                      </option>
+                    ))}
+                    <option value={CUSTOM_CATEGORY_VALUE}>Create Custom Category</option>
                   </select>
+                  <p className="text-[10px] text-[#666] uppercase tracking-wide">
+                    Hold Ctrl/Cmd to select multiple categories
+                  </p>
+                  {isCreatingCustomCategory ? (
+                    <div className="flex gap-2">
+                      <input
+                        required
+                        type="text"
+                        placeholder="Type custom category"
+                        value={customCategoryInput}
+                        onChange={(e) => setCustomCategoryInput(e.target.value)}
+                        className="flex-1 bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={addCustomCategoryToForm}
+                        className="px-4 py-3 text-xs font-bold uppercase tracking-widest rounded-lg bg-[#D4AF37] text-black hover:bg-[#bda871]"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </div>
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { API_ROUTES } from '@/lib/api';
 import {
   Search,
@@ -9,10 +9,11 @@ import {
   ShieldCheck,
   User as UserIcon,
   Calendar,
-  MoreVertical,
   Activity,
   Award,
-  ShoppingBag
+  ShoppingBag,
+  Ban,
+  Trash2
 } from 'lucide-react';
 
 type AdminUser = {
@@ -22,30 +23,51 @@ type AdminUser = {
   phone: string;
   role: string;
   createdAt: string;
+  isBlocked?: boolean;
   ordersCount?: number;
 };
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [actionLoadingUserId, setActionLoadingUserId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const getToken = () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) {
+      throw new Error('Not authenticated');
+    }
+
+    const token = JSON.parse(userStr)?.token;
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    return token;
+  };
+
+  const fetchUsers = useCallback(async () => {
+    const token = getToken();
+    const res = await fetch(API_ROUTES.AUTH, {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error('Failed to fetch users');
+    }
+
+    const data: AdminUser[] = await res.json();
+    setUsers(data);
+  }, []);
+
   useEffect(() => {
-    const fetchUsers = async () => {
+    const run = async () => {
       try {
-        const userStr = localStorage.getItem('user');
-        if (!userStr) throw new Error('Not authenticated');
-        const token = JSON.parse(userStr).token;
-
-        const res = await fetch(API_ROUTES.AUTH, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-
-        if (!res.ok) throw new Error('Failed to fetch users');
-        const data: AdminUser[] = await res.json();
-        setUsers(data);
+        await fetchUsers();
       } catch (err) {
         console.error('Error fetching admin users:', err);
         setError('Unable to fetch users. Please sign in with an admin account.');
@@ -55,8 +77,81 @@ export default function AdminUsers() {
       }
     };
 
-    fetchUsers();
+    run();
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return users;
+    }
+
+    return users.filter((user) => {
+      const haystack = [user.name, user.email, user.phone].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [users, searchQuery]);
+
+  const setBlockStatus = async (user: AdminUser, isBlocked: boolean) => {
+    const actionLabel = isBlocked ? 'block' : 'unblock';
+    if (!window.confirm(`Are you sure you want to ${actionLabel} ${user.name}?`)) {
+      return;
+    }
+
+    try {
+      setActionLoadingUserId(user._id);
+      const token = getToken();
+      const res = await fetch(`${API_ROUTES.AUTH}/${user._id}/block`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ isBlocked })
+      });
+
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || `Failed to ${actionLabel} user`);
+      }
+
+      await fetchUsers();
+    } catch (err) {
+      console.error(`Failed to ${actionLabel} user:`, err);
+      window.alert(err instanceof Error ? err.message : `Failed to ${actionLabel} user`);
+    } finally {
+      setActionLoadingUserId(null);
+    }
+  };
+
+  const deleteUser = async (user: AdminUser) => {
+    if (!window.confirm(`Delete ${user.name} permanently? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setActionLoadingUserId(user._id);
+      const token = getToken();
+      const res = await fetch(`${API_ROUTES.AUTH}/${user._id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || 'Failed to delete user');
+      }
+
+      await fetchUsers();
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      window.alert(err instanceof Error ? err.message : 'Failed to delete user');
+    } finally {
+      setActionLoadingUserId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -65,6 +160,8 @@ export default function AdminUsers() {
         <input
           type="text"
           placeholder="Search by name, email, or phone number..."
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
           className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37] transition-all font-sans"
         />
       </div>
@@ -85,7 +182,7 @@ export default function AdminUsers() {
               <tr><td colSpan={5} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">Accessing secure personnel database...</td></tr>
             ) : error ? (
               <tr><td colSpan={5} className="py-20 text-center text-red-400 font-serif tracking-wide">{error}</td></tr>
-            ) : users.map((user) => (
+            ) : filteredUsers.map((user) => (
               <tr key={user._id} className="hover:bg-white/[0.01] transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center space-x-4">
@@ -112,6 +209,12 @@ export default function AdminUsers() {
                     {user.role === 'admin' && <ShieldCheck size={12} className="mr-1 text-[#D4AF37]" />}
                     {user.role}
                   </span>
+                  {user.isBlocked ? (
+                    <div className="mt-2 inline-flex items-center px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border bg-red-500/10 text-red-400 border-red-500/20">
+                      <Ban size={12} className="mr-1" />
+                      Blocked
+                    </div>
+                  ) : null}
                 </td>
                 <td className="px-6 py-6">
                   <div className="flex flex-col">
@@ -131,12 +234,36 @@ export default function AdminUsers() {
                   </div>
                 </td>
                 <td className="px-8 py-6 text-right">
-                  <button className="p-2 text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-lg transition-all">
-                    <MoreVertical size={18} />
-                  </button>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      type="button"
+                      disabled={actionLoadingUserId === user._id || user.role === 'admin'}
+                      onClick={() => setBlockStatus(user, !Boolean(user.isBlocked))}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-[#2a2a2a] text-[#e5e5e5] hover:bg-[#141414] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Ban size={14} />
+                      {user.isBlocked ? 'Unblock' : 'Block'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={actionLoadingUserId === user._id || user.role === 'admin'}
+                      onClick={() => deleteUser(user)}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Trash2 size={14} />
+                      Delete User
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
+            {!isLoading && !error && filteredUsers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="py-20 text-center text-[#888] font-serif tracking-wide">
+                  No users found for this search.
+                </td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
       </div>

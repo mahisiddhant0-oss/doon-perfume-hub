@@ -13,9 +13,18 @@ interface Product {
   images: string[];
   price: number;
   category: string;
+  categories?: string[];
 }
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
+
+const getPrimaryCategory = (product: Product) => {
+  if (Array.isArray(product.categories) && product.categories.length > 0) {
+    const first = String(product.categories[0] || '').trim();
+    if (first) return first;
+  }
+  return String(product.category || 'general');
+};
 
 export default function Home() {
   const [viralLaunches, setViralLaunches] = useState<Product[]>([]);
@@ -236,7 +245,9 @@ export default function Home() {
                  </div>
               </div>
               <div className="text-center space-y-2">
-                <p className="text-[10px] tracking-[0.3em] font-bold text-[var(--color-brand-primary)] uppercase">{item.category.replace('-', ' ')}</p>
+                <p className="text-[10px] tracking-[0.3em] font-bold text-[var(--color-brand-primary)] uppercase">
+                  {getPrimaryCategory(item).replace('-', ' ')}
+                </p>
                 <h3 className="font-serif text-2xl text-gray-800">{item.name}</h3>
                 <div className="flex items-center justify-center gap-1 text-gray-400">
                     <Star size={10} fill="currentColor" />

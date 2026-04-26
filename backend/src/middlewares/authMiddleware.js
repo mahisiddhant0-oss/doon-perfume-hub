@@ -61,6 +61,10 @@ const protect = async (req, res, next) => {
         await req.user.save();
       }
 
+      if (req.user.isBlocked) {
+        return res.status(403).json({ message: 'Your account is blocked. Please contact support.' });
+      }
+
       next();
     } catch (error) {
       console.error(error);

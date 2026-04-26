@@ -32,6 +32,7 @@ interface Product {
   weightKg?: number;
   images: string[];
   category: string;
+  categories?: string[];
   variants: Variant[];
   stock: number;
 }
@@ -49,6 +50,14 @@ interface CartItem {
 
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80";
+
+const getPrimaryCategory = (product: Product) => {
+  if (Array.isArray(product.categories) && product.categories.length > 0) {
+    const first = String(product.categories[0] || "").trim();
+    if (first) return first;
+  }
+  return String(product.category || "general");
+};
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -114,7 +123,7 @@ export default function ProductDetails() {
       quantity,
       img: mainImage,
       size: selectedVariant?.label,
-      category: product.category,
+      category: getPrimaryCategory(product),
     };
 
     const existingIndex = cart.findIndex(
@@ -378,7 +387,7 @@ export default function ProductDetails() {
               {product.name}
             </h1>
             <p className="text-xs uppercase tracking-widest text-[var(--color-brand-primary)] font-bold mb-4">
-              {product.category.replace("-", " ")}
+              {getPrimaryCategory(product).replace("-", " ")}
             </p>
 
             <div className="flex items-center gap-4 mb-6">

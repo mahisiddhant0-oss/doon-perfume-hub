@@ -19,6 +19,7 @@ interface Product {
   price: number;
   images: string[];
   category: string;
+  categories?: string[];
   description: string;
   variants: Variant[];
   isActive: boolean;
@@ -58,6 +59,14 @@ function getProductImage(product: Product): string {
     if (img.startsWith('http')) return img;
   }
   return DEFAULT_IMAGE;
+}
+
+function getPrimaryCategory(product: Product): string {
+  if (Array.isArray(product.categories) && product.categories.length > 0) {
+    const firstCategory = String(product.categories[0] || '').trim();
+    if (firstCategory) return firstCategory;
+  }
+  return String(product.category || 'general');
 }
 
 function ProductsPageContent() {
@@ -393,7 +402,9 @@ function ProductsPageContent() {
                       )}
                     </div>
                     <div className="p-3 sm:p-5 text-center flex flex-col flex-grow">
-                      <span className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{product.category.replace('-', ' ')}</span>
+                      <span className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
+                        {getPrimaryCategory(product).replace('-', ' ')}
+                      </span>
                       <h3 className="font-serif text-sm sm:text-base text-gray-900 mb-2 leading-snug">{product.name}</h3>
                       <p className="text-gray-700 font-medium mb-4">
                         {product.variants.length > 0
