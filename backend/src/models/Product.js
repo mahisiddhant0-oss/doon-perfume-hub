@@ -56,7 +56,7 @@ const productSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-productSchema.pre('validate', function syncCategoryFields(next) {
+productSchema.pre('validate', function syncCategoryFields() {
   const normalizedCategories = Array.isArray(this.categories)
     ? this.categories
         .map((entry) => String(entry || '').trim())
@@ -73,7 +73,6 @@ productSchema.pre('validate', function syncCategoryFields(next) {
   this.categories = uniqueCategories;
   this.category = uniqueCategories[0] || normalizedPrimary || 'general';
 
-  next();
 });
 
 module.exports = mongoose.model('Product', productSchema);
