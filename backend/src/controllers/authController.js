@@ -31,18 +31,37 @@ const normalizePhone = (phone = '') => {
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
-const getConfiguredAdminEmails = () => {
-  const values = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+const DEFAULT_PERMANENT_ADMIN_EMAILS = ['doonperfumehub@gmail.com', 'mahisiddhant0@gmail.com'];
+
+const getPermanentAdminEmails = () => {
+  const values = [process.env.PERMANENT_ADMIN_EMAILS]
     .filter(Boolean)
     .flatMap((entry) => String(entry).split(','));
 
-  return new Set(values.map((entry) => normalizeEmail(entry)).filter(Boolean));
+  const normalized = values.map((entry) => normalizeEmail(entry)).filter(Boolean);
+  if (normalized.length > 0) {
+    return new Set(normalized);
+  }
+
+  return new Set(DEFAULT_PERMANENT_ADMIN_EMAILS.map((email) => normalizeEmail(email)));
 };
 
-const syncAdminRoleFromConfig = (user) => {
-  const adminEmails = getConfiguredAdminEmails();
-  if (adminEmails.has(normalizeEmail(user?.email)) && user.role !== 'admin') {
-    user.role = 'admin';
+const isPermanentAdminEmail = (email = '') => {
+  const normalizedEmail = normalizeEmail(email);
+  return normalizedEmail ? getPermanentAdminEmails().has(normalizedEmail) : false;
+};
+
+const syncUserRoleFromAllowlist = (user) => {
+  if (isPermanentAdminEmail(user?.email)) {
+    if (user.role !== 'admin') {
+      user.role = 'admin';
+    }
+    return;
+  }
+
+  if (user.role !== 'user') {
+    // Everyone outside allowlist is always a customer/user.
+    user.role = 'user';
   }
 };
 
@@ -98,7 +117,7 @@ const authWithFirebase = async (req, res) => {
       });
     }
 
-    syncAdminRoleFromConfig(user);
+    syncUserRoleFromAllowlist(user);
     await user.save();
 
     // Send back our completely independent Custom Backend JWT
@@ -289,7 +308,7 @@ const verifyOtpLogin = async (req, res) => {
 
     user.isVerified = true;
     user.lastLoginAt = new Date();
-    syncAdminRoleFromConfig(user);
+    syncUserRoleFromAllowlist(user);
     user.otpCodeHash = undefined;
     user.otpExpiresAt = undefined;
     user.otpAttempts = 0;
@@ -325,6 +344,10 @@ const elevateAdminAccess = async (req, res) => {
 
     if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
       return res.status(401).json({ message: 'Invalid admin password' });
+    }
+
+    if (!isPermanentAdminEmail(req.user?.email)) {
+      return res.status(403).json({ message: 'This account is not permitted for admin access.' });
     }
 
     req.user.role = 'admin';

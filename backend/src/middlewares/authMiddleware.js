@@ -4,12 +4,24 @@ const { getJwtSecret } = require('../config/env');
 
 const normalizeEmail = (value = '') => String(value).trim().toLowerCase();
 
-const getConfiguredAdminEmails = () => {
-  const values = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+const DEFAULT_PERMANENT_ADMIN_EMAILS = ['doonperfumehub@gmail.com', 'mahisiddhant0@gmail.com'];
+
+const getPermanentAdminEmails = () => {
+  const values = [process.env.PERMANENT_ADMIN_EMAILS]
     .filter(Boolean)
     .flatMap((entry) => String(entry).split(','));
 
-  return new Set(values.map((entry) => normalizeEmail(entry)).filter(Boolean));
+  const normalized = values.map((entry) => normalizeEmail(entry)).filter(Boolean);
+  if (normalized.length > 0) {
+    return new Set(normalized);
+  }
+  return new Set(DEFAULT_PERMANENT_ADMIN_EMAILS.map((email) => normalizeEmail(email)));
+};
+
+const isPermanentAdminUser = (user) => {
+  const email = normalizeEmail(user?.email);
+  if (!email) return false;
+  return getPermanentAdminEmails().has(email);
 };
 
 const protect = async (req, res, next) => {
@@ -37,13 +49,16 @@ const protect = async (req, res, next) => {
          return res.status(401).json({ message: 'Not authorized, user not found' });
       }
 
-      const adminEmails = getConfiguredAdminEmails();
-      if (adminEmails.has(normalizeEmail(req.user.email))) {
-        // Ensure configured owner account always gets admin privileges.
-        if (req.user.role !== 'admin') {
-          req.user.role = 'admin';
-          await req.user.save();
-        }
+      const shouldBeAdmin = isPermanentAdminUser(req.user);
+      if (shouldBeAdmin && req.user.role !== 'admin') {
+        req.user.role = 'admin';
+        await req.user.save();
+      }
+
+      if (!shouldBeAdmin && req.user.role === 'admin') {
+        // Force non-allowlisted users back to customer role.
+        req.user.role = 'user';
+        await req.user.save();
       }
 
       next();
@@ -60,7 +75,7 @@ const protect = async (req, res, next) => {
 
 // Check for Admin access
 const adminRights = (req, res, next) => {
-  if (req.user && req.user.role === 'admin') {
+  if (req.user && req.user.role === 'admin' && isPermanentAdminUser(req.user)) {
     next();
   } else {
     res.status(403).json({ message: 'Not authorized as an admin' });
