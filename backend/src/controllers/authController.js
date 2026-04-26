@@ -309,6 +309,41 @@ const verifyOtpLogin = async (req, res) => {
   }
 };
 
+// @desc    Elevate current authenticated user to admin after admin-password verification
+// @route   POST /api/auth/admin/elevate
+// @access  Private
+const elevateAdminAccess = async (req, res) => {
+  try {
+    const configuredAdminPassword = process.env.ADMIN_ACCESS_PASSWORD || '';
+    if (!configuredAdminPassword) {
+      return res.status(503).json({ message: 'Admin access password is not configured on server.' });
+    }
+
+    const providedPassword = String(req.body?.password || '');
+    const expected = Buffer.from(configuredAdminPassword, 'utf8');
+    const provided = Buffer.from(providedPassword, 'utf8');
+
+    if (expected.length !== provided.length || !crypto.timingSafeEqual(expected, provided)) {
+      return res.status(401).json({ message: 'Invalid admin password' });
+    }
+
+    req.user.role = 'admin';
+    await req.user.save();
+
+    return res.json({
+      message: 'Admin access granted',
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      phone: req.user.phone,
+      role: req.user.role,
+    });
+  } catch (error) {
+    console.error('elevateAdminAccess error:', error.message);
+    return res.status(500).json({ message: 'Failed to grant admin access' });
+  }
+};
+
 module.exports = {
   authWithFirebase,
   getUserProfile,
@@ -316,4 +351,5 @@ module.exports = {
   getUsers,
   sendOtp,
   verifyOtpLogin,
+  elevateAdminAccess,
 };

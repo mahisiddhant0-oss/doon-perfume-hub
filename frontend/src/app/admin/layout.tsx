@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { API_ROUTES } from '@/lib/api';
 import { 
   LayoutDashboard, 
   Package, 
@@ -51,6 +52,37 @@ export default function AdminLayout({
         setGateError(payload?.message || 'Invalid admin password');
         return;
       }
+
+      const storedUserRaw = localStorage.getItem('user');
+      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
+      const token = storedUser?.token || '';
+      if (!token) {
+        setGateError('Please login to your account first, then unlock admin.');
+        return;
+      }
+
+      const elevateResponse = await fetch(`${API_ROUTES.AUTH}/admin/elevate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ password: accessPassword }),
+      });
+
+      const elevatePayload = await elevateResponse.json().catch(() => ({}));
+      if (!elevateResponse.ok) {
+        setGateError(elevatePayload?.message || 'Unable to grant admin access for this account');
+        return;
+      }
+
+      localStorage.setItem(
+        'user',
+        JSON.stringify({
+          ...storedUser,
+          role: elevatePayload?.role || 'admin',
+        })
+      );
 
       sessionStorage.setItem('admin_access_granted', '1');
       setIsUnlocked(true);
