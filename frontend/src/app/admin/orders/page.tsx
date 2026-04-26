@@ -35,16 +35,16 @@ type AdminOrder = {
 
 type CustomItem = {
   name: string;
-  quantity: number;
-  price: number;
-  weightKg: number;
+  price: string;
+  weightKg: string;
+  quantity: string;
 };
 
 const emptyCustomItem = (): CustomItem => ({
   name: '',
-  quantity: 1,
-  price: 0,
-  weightKg: 0,
+  price: '',
+  weightKg: '',
+  quantity: '',
 });
 
 const normalizePaymentMethod = (value = '') => {
@@ -201,7 +201,7 @@ export default function AdminOrders() {
     setCustomItems((prev) => [...prev, emptyCustomItem()]);
   };
 
-  const updateCustomItem = (index: number, key: keyof CustomItem, value: string | number) => {
+  const updateCustomItem = (index: number, key: keyof CustomItem, value: string) => {
     setCustomItems((prev) =>
       prev.map((item, idx) => (idx === index ? { ...item, [key]: value } : item))
     );
@@ -232,7 +232,12 @@ export default function AdminOrders() {
           phone: customCustomer.phone,
           country: 'India',
         },
-        items: customItems,
+        items: customItems.map((item) => ({
+          name: item.name,
+          price: Number(item.price || 0),
+          weightKg: Number(item.weightKg || 0),
+          quantity: Number(item.quantity || 0),
+        })),
         paymentMethod: customPaymentMethod || 'manual',
       };
 
@@ -455,9 +460,9 @@ export default function AdminOrders() {
                 {customItems.map((item, index) => (
                   <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <input required placeholder="Item Name" value={item.name} onChange={(e) => updateCustomItem(index, 'name', e.target.value)} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
-                    <input required min={1} type="number" placeholder="Qty" value={item.quantity} onChange={(e) => updateCustomItem(index, 'quantity', Number(e.target.value))} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
-                    <input required min={0} step="0.01" type="number" placeholder="Price" value={item.price} onChange={(e) => updateCustomItem(index, 'price', Number(e.target.value))} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
-                    <input required min={0} step="0.01" type="number" placeholder="Weight (Kg)" value={item.weightKg} onChange={(e) => updateCustomItem(index, 'weightKg', Number(e.target.value))} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
+                    <input required min={0} step="0.01" type="number" placeholder="Price (Rs.)" value={item.price} onChange={(e) => updateCustomItem(index, 'price', e.target.value)} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
+                    <input required min={0} step="0.01" type="number" placeholder="Weight (Kg)" value={item.weightKg} onChange={(e) => updateCustomItem(index, 'weightKg', e.target.value)} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
+                    <input required min={1} type="number" placeholder="Quantity" value={item.quantity} onChange={(e) => updateCustomItem(index, 'quantity', e.target.value)} className="bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none" />
                     <button type="button" onClick={() => removeCustomItem(index)} className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg text-xs uppercase tracking-widest font-bold">Remove</button>
                   </div>
                 ))}
