@@ -5,6 +5,15 @@ import "./globals.css";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+const metadataBase = (() => {
+  if (!siteUrl) return undefined;
+
+  try {
+    return new URL(siteUrl);
+  } catch {
+    return undefined;
+  }
+})();
 
 const inter = Inter({
   variable: "--font-inter",
@@ -29,7 +38,7 @@ export const metadata: Metadata = {
     "private label perfumes",
     "Dehradun perfumes",
   ],
-  metadataBase: siteUrl ? new URL(siteUrl) : undefined,
+  metadataBase,
   referrer: "strict-origin-when-cross-origin",
   robots: {
     index: true,
