@@ -31,6 +31,21 @@ const normalizePhone = (phone = '') => {
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
+const getConfiguredAdminEmails = () => {
+  const values = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+    .filter(Boolean)
+    .flatMap((entry) => String(entry).split(','));
+
+  return new Set(values.map((entry) => normalizeEmail(entry)).filter(Boolean));
+};
+
+const syncAdminRoleFromConfig = (user) => {
+  const adminEmails = getConfiguredAdminEmails();
+  if (adminEmails.has(normalizeEmail(user?.email)) && user.role !== 'admin') {
+    user.role = 'admin';
+  }
+};
+
 const hashOtp = (email, otp) =>
   crypto.createHash('sha256').update(`${email}:${otp}:${getJwtSecret()}`).digest('hex');
 
@@ -82,6 +97,9 @@ const authWithFirebase = async (req, res) => {
         isVerified: true
       });
     }
+
+    syncAdminRoleFromConfig(user);
+    await user.save();
 
     // Send back our completely independent Custom Backend JWT
     res.json({
@@ -271,6 +289,7 @@ const verifyOtpLogin = async (req, res) => {
 
     user.isVerified = true;
     user.lastLoginAt = new Date();
+    syncAdminRoleFromConfig(user);
     user.otpCodeHash = undefined;
     user.otpExpiresAt = undefined;
     user.otpAttempts = 0;

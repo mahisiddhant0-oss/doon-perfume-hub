@@ -2,6 +2,16 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { getJwtSecret } = require('../config/env');
 
+const normalizeEmail = (value = '') => String(value).trim().toLowerCase();
+
+const getConfiguredAdminEmails = () => {
+  const values = [process.env.ADMIN_EMAIL, process.env.ADMIN_EMAILS]
+    .filter(Boolean)
+    .flatMap((entry) => String(entry).split(','));
+
+  return new Set(values.map((entry) => normalizeEmail(entry)).filter(Boolean));
+};
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -25,6 +35,15 @@ const protect = async (req, res, next) => {
 
       if (!req.user) {
          return res.status(401).json({ message: 'Not authorized, user not found' });
+      }
+
+      const adminEmails = getConfiguredAdminEmails();
+      if (adminEmails.has(normalizeEmail(req.user.email))) {
+        // Ensure configured owner account always gets admin privileges.
+        if (req.user.role !== 'admin') {
+          req.user.role = 'admin';
+          await req.user.save();
+        }
       }
 
       next();
