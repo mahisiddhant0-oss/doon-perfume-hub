@@ -10,15 +10,28 @@ const normalizeWeightKg = (value) => {
   }
   return parsed;
 };
+const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 
 const normalizeCategories = (category, categories) => {
   const fromArray = Array.isArray(categories)
     ? categories.map((entry) => String(entry || '').trim())
-    : [];
+    : typeof categories === 'string'
+      ? categories.split(',').map((entry) => String(entry || '').trim())
+      : [];
   const fromPrimary = String(category || '').trim();
 
-  const merged = [...fromArray, fromPrimary].filter(Boolean);
-  const uniqueCategories = Array.from(new Set(merged));
+  const merged = [...fromArray, fromPrimary]
+    .filter(Boolean)
+    .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(String(entry).toLowerCase()));
+
+  const seen = new Set();
+  const uniqueCategories = merged.filter((entry) => {
+    const normalized = String(entry).toLowerCase();
+    if (seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+
   return uniqueCategories.length > 0 ? uniqueCategories : ['general'];
 };
 
@@ -64,8 +77,8 @@ const MOCK_PRODUCTS = [
     name: "Oud Luxe",
     description: "Premium pure oud extract from the finest aged agarwood.",
     price: 250,
-    category: "ouds",
-    categories: ["ouds"],
+    category: "perfumes",
+    categories: ["perfumes"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1583445013765-46c20c4a6772?w=800&q=80"]
   },
@@ -84,8 +97,8 @@ const MOCK_PRODUCTS = [
     name: "Musk Pure",
     description: "Warm, long-lasting musk that develops uniquely on every skin.",
     price: 150,
-    category: "attars",
-    categories: ["attars"],
+    category: "perfumes",
+    categories: ["perfumes"],
     isActive: true,
     images: ["https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=800&q=80"]
   }
@@ -219,7 +232,8 @@ const updateProduct = async (req, res) => {
       if (isActive !== undefined) product.isActive = isActive;
 
       const updatedProduct = await product.save();
-      res.json(updatedProduct);
+      const freshProduct = await Product.findById(updatedProduct._id);
+      res.json(freshProduct || updatedProduct);
     } else {
       res.status(404).json({ message: 'Product not found' });
     }
