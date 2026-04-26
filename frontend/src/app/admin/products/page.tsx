@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useMemo } from 'react';
 import { API_ROUTES } from '@/lib/api';
 import {
   Plus,
@@ -69,6 +70,8 @@ export default function AdminProducts() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
   const [formData, setFormData] = useState<ProductForm>(emptyForm);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
 
   const fetchProducts = async () => {
     setIsLoading(true);
@@ -172,16 +175,51 @@ export default function AdminProducts() {
     }));
   };
 
+  const visibleProducts = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    let result = [...products];
+
+    if (query) {
+      result = result.filter((product) => {
+        const name = product.name?.toLowerCase() || '';
+        const sku = product.sku?.toLowerCase() || '';
+        const category = product.category?.toLowerCase() || '';
+        return name.includes(query) || sku.includes(query) || category.includes(query);
+      });
+    }
+
+    if (sortBy === 'priceAsc') {
+      result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    } else if (sortBy === 'priceDesc') {
+      result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+    }
+
+    return result;
+  }, [products, searchTerm, sortBy]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="relative flex-grow max-w-md">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" size={18} />
-          <input
-            type="text"
-            placeholder="Search by product name, SKU, or category..."
-            className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37] transition-all"
-          />
+        <div className="flex flex-col md:flex-row gap-3 flex-grow max-w-2xl">
+          <div className="relative flex-grow">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#888]" size={18} />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search by product name, SKU, or category..."
+              className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37] transition-all"
+            />
+          </div>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as 'default' | 'priceAsc' | 'priceDesc')}
+            className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-4 py-3 text-sm text-[#ccc] focus:outline-none focus:border-[#D4AF37] transition-all min-w-[210px]"
+          >
+            <option value="default">Sort: Default</option>
+            <option value="priceAsc">Sort: Price Low to High</option>
+            <option value="priceDesc">Sort: Price High to Low</option>
+          </select>
         </div>
         <button
           onClick={() => handleOpenModal()}
@@ -207,7 +245,9 @@ export default function AdminProducts() {
           <tbody className="divide-y divide-[#1a1a1a]">
             {isLoading ? (
               <tr><td colSpan={6} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">Inventory Manifest Loading...</td></tr>
-            ) : products.map((product) => (
+            ) : visibleProducts.length === 0 ? (
+              <tr><td colSpan={6} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">No products match your search/filter</td></tr>
+            ) : visibleProducts.map((product) => (
               <tr key={product._id} className="hover:bg-white/[0.01] transition-colors group">
                 <td className="px-8 py-6">
                   <div className="flex items-center space-x-4">
@@ -286,6 +326,7 @@ export default function AdminProducts() {
       <div className="flex justify-between items-center text-[#888] text-[10px] uppercase font-bold tracking-[0.2em] px-4">
         <p>DOON PERFUME HUB - Product Management Terminal</p>
         <div className="flex items-center space-x-4">
+          <span>Showing: {visibleProducts.length}</span>
           <span>Total Listings: {products.length}</span>
           <span>Out of Stock: {products.filter((p) => p.stock === 0).length}</span>
         </div>
