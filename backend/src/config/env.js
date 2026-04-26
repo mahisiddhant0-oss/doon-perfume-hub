@@ -6,9 +6,6 @@ const REQUIRED_IN_PRODUCTION = [
   'RAZORPAY_KEY_SECRET',
   'RAZORPAY_WEBHOOK_SECRET',
   'DELHIVERY_TOKEN',
-  'TWILIO_ACCOUNT_SID',
-  'TWILIO_AUTH_TOKEN',
-  'TWILIO_PHONE_NUMBER',
 ];
 
 const REQUIRED_EMAIL_VARS = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'SMTP_FROM_EMAIL', 'ADMIN_EMAIL'];
@@ -20,8 +17,6 @@ const splitCsv = (value = '') =>
     .filter(Boolean);
 
 const isProduction = process.env.NODE_ENV === 'production';
-
-const isEmailEnabled = () => String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
 
 const getAllowedOrigins = () => splitCsv(process.env.FRONTEND_URL);
 
@@ -47,19 +42,16 @@ const validateEnv = () => {
   }
 
   const missing = REQUIRED_IN_PRODUCTION.filter((key) => !process.env[key]);
-
-  if (isEmailEnabled()) {
-    const missingEmail = REQUIRED_EMAIL_VARS.filter((key) => !process.env[key]);
-    missing.push(...missingEmail);
-  }
+  const missingEmail = REQUIRED_EMAIL_VARS.filter((key) => !process.env[key]);
+  missing.push(...missingEmail);
 
   if (missing.length > 0) {
     throw new Error(`Missing required production environment variables: ${missing.join(', ')}`);
   }
 
-  const requiredKeysForPlaceholderCheck = isEmailEnabled()
-    ? [...REQUIRED_IN_PRODUCTION, ...REQUIRED_EMAIL_VARS]
-    : REQUIRED_IN_PRODUCTION;
+  const baseRequiredForPlaceholderCheck = [...REQUIRED_IN_PRODUCTION];
+
+  const requiredKeysForPlaceholderCheck = [...baseRequiredForPlaceholderCheck, ...REQUIRED_EMAIL_VARS];
 
   const placeholders = requiredKeysForPlaceholderCheck.filter((key) => hasPlaceholderValue(process.env[key]));
 

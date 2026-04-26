@@ -25,6 +25,14 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const isSmtpConfigured = () =>
+  Boolean(
+    String(process.env.SMTP_HOST || '').trim() &&
+      String(process.env.SMTP_PORT || '').trim() &&
+      String(process.env.SMTP_USER || '').trim() &&
+      String(process.env.SMTP_PASS || '').trim()
+  );
+
 /**
  * @desc    Generate professional HTML template for order confirmation
  * @param {Object} order - Full mongoose Order object
@@ -157,7 +165,49 @@ const sendAdminNewOrderAlert = async (order) => {
   }
 };
 
+/**
+ * @desc    Send Login OTP Email to customer
+ */
+const sendLoginOtpEmail = async ({ email, otp, name }) => {
+  try {
+    if (!isSmtpConfigured()) {
+      return { error: 'SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS.' };
+    }
+
+    if (!email) {
+      return { error: 'Email is required for OTP delivery.' };
+    }
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+        <div style="background: #0b4ea2; color: #ffffff; padding: 18px 20px;">
+          <h2 style="margin: 0; font-size: 20px;">DOON PERFUME HUB</h2>
+        </div>
+        <div style="padding: 20px; color: #111827;">
+          <p style="margin-top: 0;">Hi ${name || 'there'},</p>
+          <p>Your one-time login code is:</p>
+          <div style="font-size: 32px; letter-spacing: 6px; font-weight: 700; color: #0b4ea2; margin: 16px 0;">${otp}</div>
+          <p>This OTP is valid for 10 minutes.</p>
+          <p style="color: #6b7280; font-size: 12px; margin-bottom: 0;">If you did not request this, please ignore this email.</p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: resolveFromAddress('DOON PERFUME HUB'),
+      to: email,
+      subject: 'Your DOON PERFUME HUB Login OTP',
+      html,
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { error: error.message || 'Failed to send OTP email' };
+  }
+};
+
 module.exports = {
   sendOrderConfirmation,
-  sendAdminNewOrderAlert
+  sendAdminNewOrderAlert,
+  sendLoginOtpEmail,
 };

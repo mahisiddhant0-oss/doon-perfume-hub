@@ -3,7 +3,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { getJwtSecret } = require('../config/env');
-const { sendOTPSMS } = require('../services/smsService');
+const { sendLoginOtpEmail } = require('../services/emailService');
 
 // Generate custom JWT (Backend Authorization)
 const generateToken = (id) => {
@@ -29,8 +29,10 @@ const normalizePhone = (phone = '') => {
   return cleaned;
 };
 
-const hashOtp = (phone, otp) =>
-  crypto.createHash('sha256').update(`${phone}:${otp}:${getJwtSecret()}`).digest('hex');
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+
+const hashOtp = (email, otp) =>
+  crypto.createHash('sha256').update(`${email}:${otp}:${getJwtSecret()}`).digest('hex');
 
 const createOtp = () => String(crypto.randomInt(100000, 1000000));
 
@@ -164,23 +166,34 @@ const getUsers = async (req, res) => {
   }
 };
 
-// @desc    Send OTP to mobile number
+// @desc    Send OTP to email address (with mandatory phone capture)
 // @route   POST /api/auth/otp/send
 // @access  Public
 const sendOtp = async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
+    const email = normalizeEmail(req.body.email);
     const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
 
     const otp = createOtp();
-    const otpCodeHash = hashOtp(phone, otp);
+    const otpCodeHash = hashOtp(email, otp);
     const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-    let user = await User.findOne({ phone });
+    const userByEmail = await User.findOne({ email });
+    const userByPhone = await User.findOne({ phone });
+
+    if (userByEmail && userByPhone && userByEmail._id.toString() !== userByPhone._id.toString()) {
+      return res.status(409).json({
+        message: 'This email and phone belong to different accounts. Please use the originally registered pair.',
+      });
+    }
+
+    let user = userByEmail || userByPhone;
 
     if (!user) {
       user = await User.create({
-        name: name || `User_${phone.slice(-4)}`,
+        name: name || `User_${email.split('@')[0] || 'customer'}`,
+        email,
         phone,
         isVerified: false,
         otpCodeHash,
@@ -188,22 +201,29 @@ const sendOtp = async (req, res) => {
         otpAttempts: 0,
       });
     } else {
+      if (user.email && user.email !== email) {
+        return res.status(409).json({ message: 'This phone is already linked to another email.' });
+      }
+
+      if (user.phone && user.phone !== phone) {
+        return res.status(409).json({ message: 'This email is already linked to another phone number.' });
+      }
+
       user.name = name || user.name;
+      user.email = email;
+      user.phone = phone;
       user.otpCodeHash = otpCodeHash;
       user.otpExpiresAt = otpExpiresAt;
       user.otpAttempts = 0;
       await user.save();
     }
 
-    const smsResult = await sendOTPSMS(phone, otp);
-    if (smsResult?.error) {
-      return res.status(502).json({ message: `Failed to send OTP SMS: ${smsResult.error}` });
+    const emailResult = await sendLoginOtpEmail({ email, otp, name: user.name });
+    if (emailResult?.error) {
+      return res.status(502).json({ message: `Failed to send OTP email: ${emailResult.error}` });
     }
 
-    const payload = {
-      message: 'OTP sent successfully',
-      phone,
-    };
+    const payload = { message: 'OTP sent successfully', email, phone };
 
     if (process.env.NODE_ENV !== 'production') {
       payload.devOtp = otp;
@@ -222,11 +242,12 @@ const sendOtp = async (req, res) => {
 const verifyOtpLogin = async (req, res) => {
   try {
     const phone = normalizePhone(req.body.phone);
+    const email = normalizeEmail(req.body.email);
     const otp = String(req.body.otp || '').trim();
 
-    const user = await User.findOne({ phone });
+    const user = await User.findOne({ email, phone });
     if (!user) {
-      return res.status(404).json({ message: 'User not found for this phone number' });
+      return res.status(404).json({ message: 'No user found for this email and phone combination' });
     }
 
     if (!user.otpCodeHash || !user.otpExpiresAt) {
@@ -241,7 +262,7 @@ const verifyOtpLogin = async (req, res) => {
       return res.status(429).json({ message: 'Too many failed attempts. Please request a new OTP.' });
     }
 
-    const expectedHash = hashOtp(phone, otp);
+    const expectedHash = hashOtp(email, otp);
     if (user.otpCodeHash !== expectedHash) {
       user.otpAttempts += 1;
       await user.save();

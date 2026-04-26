@@ -24,6 +24,10 @@ const otpSendValidation = [
     .trim()
     .matches(/^(\+?\d{10,15})$/)
     .withMessage('Valid phone number is required'),
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Valid email address is required'),
   body('name').optional().trim().isLength({ min: 2, max: 100 }).withMessage('Name must be between 2 and 100 characters'),
   validate,
 ];
@@ -33,6 +37,10 @@ const otpVerifyValidation = [
     .trim()
     .matches(/^(\+?\d{10,15})$/)
     .withMessage('Valid phone number is required'),
+  body('email')
+    .trim()
+    .isEmail()
+    .withMessage('Valid email address is required'),
   body('otp').trim().matches(/^\d{6}$/).withMessage('OTP must be 6 digits'),
   validate,
 ];

@@ -12,6 +12,7 @@ const panelVariants = {
   exit: { opacity: 0, y: -4, scale: 0.98 },
 };
 
+const normalizeEmailInput = (email: string) => email.trim().toLowerCase();
 const normalizePhoneInput = (phone: string) => phone.replace(/[^\d+]/g, '');
 
 const toApiPhone = (phone: string) => {
@@ -35,6 +36,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [devOtp, setDevOtp] = useState('');
@@ -62,11 +64,12 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     setError('');
     setMessage('');
     try {
+      const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
       const res = await fetch(`${API_ROUTES.AUTH}/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: apiPhone }),
+        body: JSON.stringify({ email: apiEmail, phone: apiPhone }),
       });
 
       if (!res.ok) {
@@ -75,7 +78,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
 
       const data = await res.json();
       setOtpSent(true);
-      setMessage(`OTP sent to ${data.phone}`);
+      setMessage(`OTP sent to ${data.email}`);
       if (typeof data.devOtp === 'string') {
         setDevOtp(data.devOtp);
       }
@@ -91,11 +94,12 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     setError('');
     setMessage('');
     try {
+      const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
       const res = await fetch(`${API_ROUTES.AUTH}/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: apiPhone, otp }),
+        body: JSON.stringify({ email: apiEmail, phone: apiPhone, otp }),
       });
 
       if (!res.ok) {
@@ -176,12 +180,19 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
               </>
             ) : (
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-900">Login with mobile OTP</p>
+                <p className="text-sm font-medium text-gray-900">Login with email OTP</p>
                 <input
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
-                  placeholder="Enter mobile number"
+                  placeholder="Enter phone number (for delivery)"
+                  className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
+                />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(normalizeEmailInput(e.target.value))}
+                  placeholder="Enter email address"
                   className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
                 />
                 {otpSent && (
@@ -203,7 +214,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
                 <div className="flex gap-2">
                   <button
                     onClick={sendOtp}
-                    disabled={loading || !phone}
+                    disabled={loading || !email || !phone}
                     className="flex-1 bg-black text-white py-2 text-xs tracking-widest font-semibold disabled:opacity-50"
                   >
                     SEND OTP

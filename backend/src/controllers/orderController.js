@@ -6,7 +6,6 @@ const Product = require('../models/Product');
 const razorpayInstance = require('../config/razorpay');
 const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
-const { sendOrderConfirmationSMS, sendShippingSMS } = require('../services/smsService');
 
 const GST_RATE = 0.18;
 
@@ -204,10 +203,6 @@ const verifyPayment = async (req, res) => {
 
         await sendOrderConfirmation(order, req.user.email);
         await sendAdminNewOrderAlert(order);
-        await sendOrderConfirmationSMS(order, order.shippingAddress.phone);
-        if (order.awbNumber) {
-          await sendShippingSMS(order, order.shippingAddress.phone);
-        }
       } catch (logisticsError) {
         console.error('Delhivery AWB generation failed:', logisticsError.message);
       }

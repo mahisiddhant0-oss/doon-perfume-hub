@@ -8,14 +8,16 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
+    required: false,
     unique: true,
+    sparse: true,
     trim: true
   },
   email: {
     type: String,
     trim: true,
     lowercase: true,
+    unique: true,
     sparse: true // Useful if some users log in via phone and don't provide email immediately
   },
   address: {

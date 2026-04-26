@@ -3,7 +3,6 @@ const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
-const { sendOrderConfirmationSMS, sendShippingSMS } = require('../services/smsService');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
 
@@ -97,10 +96,6 @@ const handleRazorpayWebhook = async (req, res) => {
 
           await sendOrderConfirmation(order, order.user.email);
           await sendAdminNewOrderAlert(order);
-          await sendOrderConfirmationSMS(order, order.shippingAddress.phone);
-          if (order.awbNumber) {
-            await sendShippingSMS(order, order.shippingAddress.phone);
-          }
         } catch (logisticsError) {
           console.error('Logistics API failed during webhook processing:', logisticsError.message);
         }
