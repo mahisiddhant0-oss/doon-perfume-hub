@@ -41,18 +41,6 @@ export default function AdminLayout({
     setIsVerifying(true);
 
     try {
-      const response = await fetch('/api/admin/access', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: accessPassword }),
-      });
-
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setGateError(payload?.message || 'Invalid admin password');
-        return;
-      }
-
       const storedUserRaw = localStorage.getItem('user');
       const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
       const token = storedUser?.token || '';
