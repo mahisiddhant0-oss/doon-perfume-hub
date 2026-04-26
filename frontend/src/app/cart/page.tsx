@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&q=80';
 const GST_RATE = 0.18;
+const SHIPPING_RATE_PER_KG = 70;
 
 const roundToTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
@@ -41,7 +42,9 @@ export default function CartPage() {
 
   const subtotal = roundToTwo(items.reduce((acc, item) => acc + (Number(item.price) * Number(item.quantity)), 0));
   const gstAmount = roundToTwo(subtotal * GST_RATE);
-  const grandTotal = roundToTwo(subtotal + gstAmount);
+  const totalWeightKg = roundToTwo(items.reduce((acc, item) => acc + (Number(item.weightKg || 0) * Number(item.quantity)), 0));
+  const shippingAmount = roundToTwo(totalWeightKg * SHIPPING_RATE_PER_KG);
+  const grandTotal = roundToTwo(subtotal + gstAmount + shippingAmount);
 
   if (loading) return null;
 
@@ -151,11 +154,11 @@ export default function CartPage() {
                 </div>
                 <div className="flex justify-between text-sm text-gray-500">
                     <span className="tracking-widest uppercase text-[10px] font-bold">Shipping (Delhivery)</span>
-                    <span className="text-green-600 font-bold tracking-widest uppercase text-[10px]">FREE</span>
+                    <span className="font-medium">Rs. {shippingAmount.toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-sm text-gray-500">
-                    <span className="tracking-widest uppercase text-[10px] font-bold">Packaging</span>
-                    <span className="text-green-600 font-bold tracking-widest uppercase text-[10px]">PREMIUM</span>
+                    <span className="tracking-widest uppercase text-[10px] font-bold">Chargeable Weight</span>
+                    <span className="font-medium">{totalWeightKg.toLocaleString('en-IN')} Kg</span>
                 </div>
               </div>
               
@@ -164,7 +167,7 @@ export default function CartPage() {
                     <span className="font-serif text-xl">Grand Total</span>
                     <span className="text-3xl font-medium text-[var(--color-brand-primary)]">Rs. {grandTotal.toLocaleString('en-IN')}</span>
                 </div>
-                <p className="text-[10px] text-gray-400 mt-2 tracking-widest uppercase font-bold text-right">Taxes included at checkout</p>
+                <p className="text-[10px] text-gray-400 mt-2 tracking-widest uppercase font-bold text-right">GST applies only on products, not shipping</p>
               </div>
               
               <Link href="/checkout">

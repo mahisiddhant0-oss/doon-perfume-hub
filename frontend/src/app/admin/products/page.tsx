@@ -19,6 +19,7 @@ type AdminProduct = {
   sku: string;
   price: number;
   stock: number;
+  weightKg?: number;
   category: string;
   description?: string;
   images?: string[];
@@ -30,6 +31,7 @@ type ProductForm = {
   sku: string;
   price: number;
   stock: number;
+  weightKg: number;
   category: string;
   description: string;
   images: string[];
@@ -40,6 +42,7 @@ const emptyForm: ProductForm = {
   sku: '',
   price: 0,
   stock: 0,
+  weightKg: 0,
   category: 'perfumes',
   description: '',
   images: []
@@ -78,6 +81,7 @@ export default function AdminProducts() {
         sku: product.sku,
         price: product.price,
         stock: product.stock,
+        weightKg: Number(product.weightKg || 0),
         category: product.category,
         description: product.description || '',
         images: product.images || []
@@ -191,7 +195,10 @@ export default function AdminProducts() {
                   </div>
                 </td>
                 <td className="px-6 py-6">
-                  <span className="text-[#D4AF37] font-serif font-bold italic text-lg">Rs. {product.price}</span>
+                  <div className="flex flex-col">
+                    <span className="text-[#D4AF37] font-serif font-bold italic text-lg">Rs. {product.price}</span>
+                    <span className="text-[#888] text-[10px] uppercase tracking-widest mt-1">Wt: {Number(product.weightKg || 0)} Kg</span>
+                  </div>
                 </td>
                 <td className="px-6 py-6">
                   {product.isActive ? (
@@ -263,7 +270,7 @@ export default function AdminProducts() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Price (Rs.)</label>
                   <input
@@ -281,6 +288,18 @@ export default function AdminProducts() {
                     type="number"
                     value={formData.stock}
                     onChange={(e) => setFormData({ ...formData, stock: Number(e.target.value) })}
+                    className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Weight (Kg)</label>
+                  <input
+                    required
+                    min={0}
+                    step="0.01"
+                    type="number"
+                    value={formData.weightKg}
+                    onChange={(e) => setFormData({ ...formData, weightKg: Number(e.target.value) })}
                     className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
                   />
                 </div>

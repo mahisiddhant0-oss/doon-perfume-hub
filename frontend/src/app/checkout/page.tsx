@@ -8,6 +8,8 @@ import { useState, useEffect } from 'react';
 import { API_ROUTES, getAuthToken } from '@/lib/api';
 
 const GST_RATE = 0.18;
+const SHIPPING_RATE_PER_KG = 70;
+const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&q=80';
 
 const INDIA_STATES_AND_UTS = [
   'Andhra Pradesh',
@@ -50,6 +52,17 @@ const INDIA_STATES_AND_UTS = [
 
 const roundToTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
+type CartItem = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  img?: string;
+  size?: string;
+  category?: string;
+  weightKg?: number;
+};
+
 export default function CheckoutPage() {
   const [address, setAddress] = useState({
     firstName: '',
@@ -61,7 +74,7 @@ export default function CheckoutPage() {
     pincode: '',
     phone: '',
   });
-  const [cartItems, setCartItems] = useState<any[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setAddress({ ...address, [e.target.name]: e.target.value });
@@ -172,7 +185,9 @@ export default function CheckoutPage() {
 
   const subtotal = roundToTwo(cartItems.reduce((acc, item) => acc + Number(item.price) * Number(item.quantity), 0));
   const gstAmount = roundToTwo(subtotal * GST_RATE);
-  const grandTotal = roundToTwo(subtotal + gstAmount);
+  const totalWeightKg = roundToTwo(cartItems.reduce((acc, item) => acc + Number(item.weightKg || 0) * Number(item.quantity), 0));
+  const shippingAmount = roundToTwo(totalWeightKg * SHIPPING_RATE_PER_KG);
+  const grandTotal = roundToTwo(subtotal + gstAmount + shippingAmount);
 
   return (
     <div className="bg-[var(--color-brand-bg)] min-h-screen">
@@ -270,7 +285,7 @@ export default function CheckoutPage() {
                 return (
                   <div key={item.id} className="flex gap-4 items-center">
                     <div className="relative w-16 h-20 flex-shrink-0 bg-white border border-gray-200">
-                      <Image src={item.img} alt={item.name} fill className="object-cover" />
+                      <Image src={item.img || DEFAULT_IMAGE} alt={item.name} fill className="object-cover" />
                       <span className="absolute -top-2 -right-2 bg-gray-500 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center">{item.quantity}</span>
                     </div>
                     <div className="flex-1">
@@ -294,13 +309,17 @@ export default function CheckoutPage() {
               </div>
               <div className="flex justify-between text-sm text-gray-600">
                 <span>Shipping</span>
-                <span>Free</span>
+                <span>Rs. {shippingAmount.toLocaleString('en-IN')}</span>
+              </div>
+              <div className="flex justify-between text-sm text-gray-600">
+                <span>Chargeable Weight</span>
+                <span>{totalWeightKg.toLocaleString('en-IN')} Kg</span>
               </div>
               <div className="flex justify-between text-lg font-medium text-gray-900 pt-4 border-t border-gray-200">
                 <span>Total</span>
                 <span>Rs. {grandTotal.toLocaleString('en-IN')}</span>
               </div>
-              <p className="text-xs text-gray-500">Including Rs. {gstAmount.toLocaleString('en-IN')} in taxes</p>
+              <p className="text-xs text-gray-500">Including Rs. {gstAmount.toLocaleString('en-IN')} GST on products only (shipping is non-taxed)</p>
             </div>
 
             <div className="mt-8 pt-6 border-t border-gray-200 border-dashed">

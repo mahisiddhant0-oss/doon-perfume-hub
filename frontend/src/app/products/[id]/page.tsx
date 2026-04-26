@@ -29,6 +29,7 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  weightKg?: number;
   images: string[];
   category: string;
   variants: Variant[];
@@ -39,6 +40,7 @@ interface CartItem {
   id: string;
   name: string;
   price: number;
+  weightKg?: number;
   quantity: number;
   img?: string;
   size?: string;
@@ -108,6 +110,7 @@ export default function ProductDetails() {
       id: product._id,
       name: product.name,
       price: selectedVariant ? selectedVariant.price : product.price,
+      weightKg: selectedVariant ? selectedVariant.weight : Number(product.weightKg || 0),
       quantity,
       img: mainImage,
       size: selectedVariant?.label,

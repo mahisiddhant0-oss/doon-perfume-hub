@@ -8,34 +8,60 @@ const { createShipment, schedulePickup } = require('../services/delhiveryService
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
 
 const GST_RATE = 0.18;
+const SHIPPING_RATE_PER_KG = 70;
 
 const roundToTwo = (value) => Math.round((value + Number.EPSILON) * 100) / 100;
+const roundWeight = (value) => Math.round((value + Number.EPSILON) * 1000) / 1000;
 
-const calculateBilling = (items = []) => {
+const calculateBilling = (items = [], productMap = new Map()) => {
   const normalizedItems = items.map((item) => {
+    const productId = String(item.id || item.product || '');
+    const product = productMap.get(productId);
+
+    if (!product) {
+      throw new Error(`Product not found for checkout item: ${productId}`);
+    }
+
+    const selectedSize = typeof item.size === 'string' ? item.size.trim() : '';
+    const matchedVariant = selectedSize
+      ? (product.variants || []).find((variant) => variant.label === selectedSize)
+      : null;
+
+    if (selectedSize && !matchedVariant) {
+      throw new Error(`Selected size "${selectedSize}" is unavailable for ${product.name}`);
+    }
+
     const quantity = Number(item.quantity) || 0;
-    const price = Number(item.price) || 0;
+    if (quantity < 1) {
+      throw new Error(`Invalid quantity for ${product.name}`);
+    }
+
+    const price = Number(matchedVariant?.price ?? product.price) || 0;
+    const weightKg = Math.max(0, Number(matchedVariant?.weight ?? product.weightKg ?? 0) || 0);
     const baseAmount = price * quantity;
     const gstAmount = roundToTwo(baseAmount * GST_RATE);
     const totalAmount = roundToTwo(baseAmount + gstAmount);
 
     return {
-      product: item.id || item.product,
-      name: item.name,
+      product: product._id,
+      name: product.name,
       quantity,
       price,
+      weightKg: roundWeight(weightKg),
       baseAmount: roundToTwo(baseAmount),
       gstAmount,
       totalAmount,
-      size: item.size,
+      size: selectedSize || undefined,
     };
   });
 
   const subtotal = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.baseAmount, 0));
   const gstAmount = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.gstAmount, 0));
-  const totalAmount = roundToTwo(subtotal + gstAmount);
+  const totalWeightKg = roundWeight(normalizedItems.reduce((acc, item) => acc + item.weightKg * item.quantity, 0));
+  const shippingAmount = roundToTwo(totalWeightKg * SHIPPING_RATE_PER_KG);
+  const totalAmount = roundToTwo(subtotal + gstAmount + shippingAmount);
 
-  return { normalizedItems, subtotal, gstAmount, totalAmount };
+  return { normalizedItems, subtotal, gstAmount, shippingAmount, totalWeightKg, totalAmount };
 };
 
 const ensureRazorpayConfigured = () => {
@@ -71,32 +97,43 @@ const createOrder = async (req, res) => {
     let orderItems = [];
     let subtotal = 0;
     let gstAmount = 0;
+    let shippingAmount = 0;
+    let totalWeightKg = 0;
     let totalAmount = 0;
+    let checkoutItems = [];
 
     if (bodyItems && bodyItems.length > 0) {
-      const billing = calculateBilling(bodyItems);
-      orderItems = billing.normalizedItems;
-      subtotal = billing.subtotal;
-      gstAmount = billing.gstAmount;
-      totalAmount = billing.totalAmount;
+      checkoutItems = bodyItems;
     } else {
       const cart = await Cart.findOne({ user: req.user._id }).populate('items.product');
       if (!cart || cart.items.length === 0) {
         return res.status(400).json({ message: 'Your cart is empty. Add items before placing an order.' });
       }
-      const billing = calculateBilling(
-        cart.items.map((item) => ({
-          id: item.product._id,
-          name: item.product.name,
-          quantity: item.quantity,
-          price: item.product.price,
-        }))
-      );
-      orderItems = billing.normalizedItems;
-      subtotal = billing.subtotal;
-      gstAmount = billing.gstAmount;
-      totalAmount = billing.totalAmount;
+      checkoutItems = cart.items.map((item) => ({
+        id: item.product._id,
+        quantity: item.quantity,
+      }));
     }
+
+    const productIds = [...new Set(checkoutItems.map((item) => String(item.id || item.product || '')))].filter(Boolean);
+    if (productIds.length === 0) {
+      return res.status(400).json({ message: 'No valid items found for checkout.' });
+    }
+
+    const products = await Product.find({ _id: { $in: productIds } }).select('name price variants weightKg');
+    const productMap = new Map(products.map((product) => [String(product._id), product]));
+
+    if (productMap.size !== productIds.length) {
+      return res.status(400).json({ message: 'One or more products in your cart are unavailable.' });
+    }
+
+    const billing = calculateBilling(checkoutItems, productMap);
+    orderItems = billing.normalizedItems;
+    subtotal = billing.subtotal;
+    gstAmount = billing.gstAmount;
+    shippingAmount = billing.shippingAmount;
+    totalWeightKg = billing.totalWeightKg;
+    totalAmount = billing.totalAmount;
 
     const razorpayOrder = await razorpayInstance.orders.create({
       amount: Math.round(totalAmount * 100),
@@ -110,6 +147,8 @@ const createOrder = async (req, res) => {
       totalAmount,
       subtotal,
       gstAmount,
+      shippingAmount,
+      totalWeightKg,
       shippingAddress,
       orderStatus: 'pending',
       paymentStatus: 'pending',
@@ -131,6 +170,9 @@ const createOrder = async (req, res) => {
       key: process.env.RAZORPAY_KEY_ID,
       subtotal,
       gstAmount,
+      shippingAmount,
+      totalWeightKg,
+      totalAmount,
     });
   } catch (error) {
     console.error('createOrder error:', error.message);

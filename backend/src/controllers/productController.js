@@ -3,6 +3,13 @@ const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
 const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
 const escapeRegex = (value = '') => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const normalizeWeightKg = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return 0;
+  }
+  return parsed;
+};
 
 const MOCK_PRODUCTS = [
   {
@@ -98,7 +105,7 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes } = req.body;
+    const { name, description, price, sku, category, stock, images, attributes, weightKg } = req.body;
 
     const productExists = await Product.findOne({ sku });
     if (productExists) {
@@ -112,6 +119,7 @@ const createProduct = async (req, res) => {
       sku,
       category,
       stock,
+      weightKg: normalizeWeightKg(weightKg),
       images,
       attributes
     });
@@ -128,7 +136,7 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes, isActive } = req.body;
+    const { name, description, price, sku, category, stock, images, attributes, isActive, weightKg } = req.body;
 
     const product = await Product.findById(req.params.id);
 
@@ -139,6 +147,7 @@ const updateProduct = async (req, res) => {
       product.sku = sku || product.sku;
       product.category = category || product.category;
       product.stock = stock !== undefined ? stock : product.stock;
+      product.weightKg = weightKg !== undefined ? normalizeWeightKg(weightKg) : product.weightKg;
       
       if (images) product.images = images;
       if (attributes) product.attributes = attributes;

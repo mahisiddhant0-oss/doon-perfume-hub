@@ -5,7 +5,7 @@ const Cart = require('../models/Cart');
 // @access  Private
 const getCart = async (req, res) => {
   try {
-    let cart = await Cart.findOne({ user: req.user._id }).populate('items.product', 'name price images stock');
+    let cart = await Cart.findOne({ user: req.user._id }).populate('items.product', 'name price images stock weightKg variants');
     if (!cart) {
       // Create empty cart if it doesn't exist
       cart = await Cart.create({ user: req.user._id, items: [] });
@@ -43,7 +43,7 @@ const addToCart = async (req, res) => {
     await cart.save();
     
     // Return populated cart to client for immediate UI updates
-    const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock');
+    const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock weightKg variants');
     res.json(populatedCart);
   } catch (error) {
     res.status(500).json({ message: 'Error adding to cart', error: error.message });
@@ -72,7 +72,7 @@ const updateQuantity = async (req, res) => {
     if (itemIndex > -1) {
       cart.items[itemIndex].quantity = quantity;
       await cart.save();
-      const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock');
+      const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock weightKg variants');
       res.json(populatedCart);
     } else {
       res.status(404).json({ message: 'Item not found in cart' });
@@ -97,7 +97,7 @@ const removeFromCart = async (req, res) => {
     cart.items = cart.items.filter(item => item.product.toString() !== productId);
     
     await cart.save();
-    const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock');
+    const populatedCart = await Cart.findById(cart._id).populate('items.product', 'name price images stock weightKg variants');
     res.json(populatedCart);
   } catch (error) {
     res.status(500).json({ message: 'Error removing from cart', error: error.message });

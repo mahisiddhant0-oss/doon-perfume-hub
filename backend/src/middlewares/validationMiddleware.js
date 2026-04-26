@@ -54,6 +54,7 @@ const productValidation = [
   body('category').trim().notEmpty().withMessage('Category is required'),
   body('sku').trim().notEmpty().withMessage('SKU is required').isLength({ min: 3, max: 64 }).withMessage('SKU must be between 3 and 64 characters'),
   body('stock').optional().isNumeric().withMessage('Stock must be a number'),
+  body('weightKg').optional().isNumeric().withMessage('Weight must be a number').custom((v) => v >= 0).withMessage('Weight cannot be negative'),
   body('description').optional().trim().isLength({ max: 5000 }).withMessage('Description is too long'),
   validate,
 ];

@@ -38,6 +38,11 @@ const productSchema = new mongoose.Schema({
     default: 100,
     min: 0
   },
+  weightKg: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
   images: [String], // Simple array of URL strings
   variants: [variantSchema],
   isActive: {

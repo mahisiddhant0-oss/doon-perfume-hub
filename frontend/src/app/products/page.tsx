@@ -28,6 +28,7 @@ interface CartItem {
   id: string;
   name: string;
   price: number;
+  weightKg?: number;
   quantity: number;
   img?: string;
   size?: string;

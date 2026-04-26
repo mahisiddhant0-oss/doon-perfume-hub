@@ -10,6 +10,7 @@ const orderItemSchema = new mongoose.Schema({
   quantity: { type: Number, required: true, min: 1 },
   price: { type: Number, required: true }, // Price at the time of purchase
   size: { type: String },
+  weightKg: { type: Number, default: 0, min: 0 },
   baseAmount: { type: Number, required: true },
   gstAmount: { type: Number, required: true },
   totalAmount: { type: Number, required: true }
@@ -33,6 +34,16 @@ const orderSchema = new mongoose.Schema({
   gstAmount: {
     type: Number,
     required: true
+  },
+  shippingAmount: {
+    type: Number,
+    required: true,
+    default: 0
+  },
+  totalWeightKg: {
+    type: Number,
+    required: true,
+    default: 0
   },
   shippingAddress: {
     firstName: { type: String, required: true },
