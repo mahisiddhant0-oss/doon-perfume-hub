@@ -55,6 +55,11 @@ const productValidation = [
   body('sku').trim().notEmpty().withMessage('SKU is required').isLength({ min: 3, max: 64 }).withMessage('SKU must be between 3 and 64 characters'),
   body('stock').optional().isNumeric().withMessage('Stock must be a number'),
   body('weightKg').optional().isNumeric().withMessage('Weight must be a number').custom((v) => v >= 0).withMessage('Weight cannot be negative'),
+  body('variants').optional().isArray().withMessage('Variants must be an array'),
+  body('variants.*.label').optional().trim().isLength({ min: 1, max: 60 }).withMessage('Variant label is required'),
+  body('variants.*.price').optional().isNumeric().withMessage('Variant price must be a number').custom((v) => v >= 0).withMessage('Variant price cannot be negative'),
+  body('variants.*.stock').optional().isNumeric().withMessage('Variant stock must be a number').custom((v) => v >= 0).withMessage('Variant stock cannot be negative'),
+  body('variants.*.weight').optional().isNumeric().withMessage('Variant weight must be a number').custom((v) => v >= 0).withMessage('Variant weight cannot be negative'),
   body('description').optional().trim().isLength({ max: 5000 }).withMessage('Description is too long'),
   validate,
 ];

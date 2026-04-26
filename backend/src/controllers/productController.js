@@ -11,6 +11,32 @@ const normalizeWeightKg = (value) => {
   return parsed;
 };
 
+const normalizeVariants = (variants = []) => {
+  if (!Array.isArray(variants)) {
+    return [];
+  }
+
+  return variants
+    .map((variant) => {
+      const label = String(variant?.label || '').trim();
+      const price = Number(variant?.price);
+      const stock = Number(variant?.stock);
+      const weight = Number(variant?.weight);
+
+      if (!label || !Number.isFinite(price) || price < 0) {
+        return null;
+      }
+
+      return {
+        label,
+        price,
+        stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
+        weight: Number.isFinite(weight) && weight >= 0 ? weight : 0,
+      };
+    })
+    .filter(Boolean);
+};
+
 const MOCK_PRODUCTS = [
   {
     _id: "mock1",
@@ -105,7 +131,7 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes, weightKg } = req.body;
+    const { name, description, price, sku, category, stock, images, attributes, weightKg, variants } = req.body;
 
     const productExists = await Product.findOne({ sku });
     if (productExists) {
@@ -121,7 +147,8 @@ const createProduct = async (req, res) => {
       stock,
       weightKg: normalizeWeightKg(weightKg),
       images,
-      attributes
+      attributes,
+      variants: normalizeVariants(variants),
     });
 
     const createdProduct = await product.save();
@@ -136,7 +163,7 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, stock, images, attributes, isActive, weightKg } = req.body;
+    const { name, description, price, sku, category, stock, images, attributes, isActive, weightKg, variants } = req.body;
 
     const product = await Product.findById(req.params.id);
 
@@ -151,6 +178,7 @@ const updateProduct = async (req, res) => {
       
       if (images) product.images = images;
       if (attributes) product.attributes = attributes;
+      if (variants !== undefined) product.variants = normalizeVariants(variants);
       if (isActive !== undefined) product.isActive = isActive;
 
       const updatedProduct = await product.save();

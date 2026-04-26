@@ -20,10 +20,23 @@ type AdminProduct = {
   price: number;
   stock: number;
   weightKg?: number;
+  variants?: {
+    label: string;
+    price: number;
+    stock: number;
+    weight: number;
+  }[];
   category: string;
   description?: string;
   images?: string[];
   isActive?: boolean;
+};
+
+type VariantForm = {
+  label: string;
+  price: number;
+  stock: number;
+  weight: number;
 };
 
 type ProductForm = {
@@ -32,6 +45,7 @@ type ProductForm = {
   price: number;
   stock: number;
   weightKg: number;
+  variants: VariantForm[];
   category: string;
   description: string;
   images: string[];
@@ -43,6 +57,7 @@ const emptyForm: ProductForm = {
   price: 0,
   stock: 0,
   weightKg: 0,
+  variants: [],
   category: 'perfumes',
   description: '',
   images: []
@@ -82,6 +97,14 @@ export default function AdminProducts() {
         price: product.price,
         stock: product.stock,
         weightKg: Number(product.weightKg || 0),
+        variants: Array.isArray(product.variants)
+          ? product.variants.map((variant) => ({
+              label: String(variant.label || ''),
+              price: Number(variant.price || 0),
+              stock: Number(variant.stock || 0),
+              weight: Number(variant.weight || 0),
+            }))
+          : [],
         category: product.category,
         description: product.description || '',
         images: product.images || []
@@ -108,7 +131,10 @@ export default function AdminProducts() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          variants: formData.variants.filter((variant) => variant.label.trim().length > 0),
+        })
       });
 
       if (res.ok) {
@@ -121,6 +147,29 @@ export default function AdminProducts() {
     } catch (err) {
       console.error('Save error:', err);
     }
+  };
+
+  const addVariant = () => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: [...prev.variants, { label: '', price: 0, stock: 0, weight: 0 }],
+    }));
+  };
+
+  const updateVariant = (index: number, field: keyof VariantForm, value: string | number) => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.map((variant, idx) =>
+        idx === index ? { ...variant, [field]: value } : variant
+      ),
+    }));
+  };
+
+  const removeVariant = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      variants: prev.variants.filter((_, idx) => idx !== index),
+    }));
   };
 
   return (
@@ -198,6 +247,11 @@ export default function AdminProducts() {
                   <div className="flex flex-col">
                     <span className="text-[#D4AF37] font-serif font-bold italic text-lg">Rs. {product.price}</span>
                     <span className="text-[#888] text-[10px] uppercase tracking-widest mt-1">Wt: {Number(product.weightKg || 0)} Kg</span>
+                    {product.variants?.length ? (
+                      <span className="text-[#888] text-[10px] uppercase tracking-widest mt-1">
+                        {product.variants.length} Variant{product.variants.length > 1 ? 's' : ''}
+                      </span>
+                    ) : null}
                   </div>
                 </td>
                 <td className="px-6 py-6">
@@ -327,6 +381,71 @@ export default function AdminProducts() {
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
                 />
+              </div>
+
+              <div className="space-y-3 border border-[#1a1a1a] rounded-xl p-4 bg-black/30">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Variants (Size/Price/Stock/Weight)</label>
+                  <button
+                    type="button"
+                    onClick={addVariant}
+                    className="text-[10px] uppercase tracking-widest font-bold text-[#D4AF37] hover:text-white transition-colors"
+                  >
+                    + Add Variant
+                  </button>
+                </div>
+
+                {formData.variants.length === 0 ? (
+                  <p className="text-[11px] text-[#666]">No variants added. Use base price/stock/weight for single-size product.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {formData.variants.map((variant, index) => (
+                      <div key={`variant-${index}`} className="grid grid-cols-12 gap-2 items-center">
+                        <input
+                          type="text"
+                          placeholder="Size Label (e.g. 10ml)"
+                          value={variant.label}
+                          onChange={(e) => updateVariant(index, 'label', e.target.value)}
+                          className="col-span-4 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Price"
+                          value={variant.price}
+                          onChange={(e) => updateVariant(index, 'price', Number(e.target.value))}
+                          className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          placeholder="Stock"
+                          value={variant.stock}
+                          onChange={(e) => updateVariant(index, 'stock', Number(e.target.value))}
+                          className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                        />
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          placeholder="Weight Kg"
+                          value={variant.weight}
+                          onChange={(e) => updateVariant(index, 'weight', Number(e.target.value))}
+                          className="col-span-3 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeVariant(index)}
+                          className="col-span-1 text-red-400 hover:text-red-300 transition-colors"
+                          title="Remove Variant"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="pt-4">
