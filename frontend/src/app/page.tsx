@@ -156,7 +156,34 @@ export default function Home() {
             <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] text-gray-400 uppercase">Premium Selection</p>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-x-4 gap-y-10 md:gap-x-6 md:gap-y-12">
+          <div className="md:hidden -mx-4 px-4 overflow-x-auto no-scrollbar snap-x snap-mandatory">
+            <div className="flex gap-4 pr-4">
+              {categories.map((cat, i) => (
+                <Link
+                  href={`/products?category=${cat.slug}`}
+                  key={i}
+                  className="min-w-[46%] snap-start flex flex-col items-center group"
+                >
+                  <div className="w-full aspect-square rounded-2xl bg-[#fdf8f4] flex items-center justify-center mb-3 transition-all duration-500 group-hover:bg-[#f9eee4] group-hover:shadow-md group-hover:-translate-y-1">
+                    <div className="w-10 h-10 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                      <Image
+                        src={cat.icon}
+                        alt={cat.name}
+                        fill
+                        className="object-contain p-2"
+                        unoptimized
+                      />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-medium text-gray-400 text-center leading-tight group-hover:text-black transition-colors px-1">
+                    {cat.name}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden md:grid md:grid-cols-5 gap-x-6 gap-y-12">
             {categories.map((cat, i) => (
               <Link href={`/products?category=${cat.slug}`} key={i} className="flex flex-col items-center group">
                 <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[#fdf8f4] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#f9eee4] group-hover:shadow-md group-hover:-translate-y-1">
