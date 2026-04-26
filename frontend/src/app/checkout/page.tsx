@@ -113,7 +113,7 @@ export default function CheckoutPage() {
           contact: address.phone,
         },
         theme: {
-          color: '#bda871',
+          color: '#0b4ea2',
         },
       };
 
@@ -136,7 +136,7 @@ export default function CheckoutPage() {
   const grandTotal = roundToTwo(subtotal + gstAmount);
 
   return (
-    <div className="bg-[#fcfcfc] min-h-screen">
+    <div className="bg-[var(--color-brand-bg)] min-h-screen">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
 
       <header className="border-b bg-white py-6">

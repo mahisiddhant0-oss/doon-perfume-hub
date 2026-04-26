@@ -38,13 +38,13 @@ export default function OrderSuccessPage() {
   }, [id]);
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#fdfbf6]">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--color-brand-bg)]">
         <div className="animate-pulse text-[var(--color-brand-primary)] font-serif text-2xl">Confirming your fragrance...</div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-[#fdfbf6] py-12 md:py-24 px-4">
+    <div className="min-h-screen bg-[var(--color-brand-bg)] py-12 md:py-24 px-4">
       <div className="max-w-3xl mx-auto bg-white shadow-xl rounded-2xl overflow-hidden">
         
         {/* Success Header */}

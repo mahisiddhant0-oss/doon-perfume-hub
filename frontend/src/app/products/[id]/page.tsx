@@ -171,9 +171,9 @@ export default function ProductDetails() {
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
 
   return (
-    <div className="bg-[#f7f7f7] min-h-screen pb-24">
-      <header className="sticky top-0 z-50 bg-white border-b border-[#e6e4dc]">
-        <div className="bg-[#bda871] text-white text-xs text-center py-2 font-medium tracking-wide">
+    <div className="bg-[var(--color-brand-bg)] min-h-screen pb-24">
+      <header className="sticky top-0 z-50 bg-white border-b border-[var(--color-brand-border)]">
+        <div className="bg-[var(--color-brand-primary)] text-white text-xs text-center py-2 font-medium tracking-wide">
           EXTRA 5% OFF | USE CODE: MAKEHOMESPECIAL
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -240,7 +240,7 @@ export default function ProductDetails() {
                   </span>
                 </Link>
 
-                <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 mt-3 w-96 max-h-[420px] overflow-y-auto bg-white border border-[#e6e4dc] shadow-2xl p-5">
+                <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 mt-3 w-96 max-h-[420px] overflow-y-auto bg-white border border-[var(--color-brand-border)] shadow-2xl p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-serif text-xl text-gray-900">Your Cart</h3>
                     <span className="text-xs tracking-widest uppercase text-gray-400">
@@ -403,7 +403,7 @@ export default function ProductDetails() {
                       onClick={() => setSelectedVariant(variant)}
                       className={`px-6 py-2 border text-sm transition-all ${
                         selectedVariant?.label === variant.label
-                          ? "border-[var(--color-brand-primary)] bg-[#fdfbf6] text-[var(--color-brand-primary)] font-semibold shadow-sm"
+                          ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-soft)] text-[var(--color-brand-primary)] font-semibold shadow-sm"
                           : "border-gray-200 text-gray-500 hover:border-gray-400"
                       }`}
                     >
@@ -492,7 +492,7 @@ export default function ProductDetails() {
                     key={tab}
                     className={`flex-1 py-4 px-2 text-[10px] md:text-xs uppercase tracking-widest font-bold transition-colors ${
                       activeTab === tab
-                        ? "bg-[#fdfbf6] text-[var(--color-brand-primary)]"
+                        ? "bg-[var(--color-brand-soft)] text-[var(--color-brand-primary)]"
                         : "text-gray-400 hover:text-gray-600"
                     }`}
                     onClick={() => setActiveTab(tab)}
@@ -532,7 +532,7 @@ export default function ProductDetails() {
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#e6e4dc] shadow-2xl">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[var(--color-brand-border)] shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
           <button
             onClick={handleAddToCart}

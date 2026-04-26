@@ -69,7 +69,7 @@ export default function Home() {
 
   return (
     <div className="bg-[var(--color-brand-bg)] overflow-x-hidden">
-      <header className="sticky top-0 z-50 bg-[#fdfbf6]/95 backdrop-blur-md border-b border-[#e6e4dc]">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-brand-border)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="h-16 md:h-20 flex items-center justify-between gap-2">
             <Link href="/" className="flex items-center">
@@ -103,14 +103,14 @@ export default function Home() {
             </nav>
 
             <nav className="flex md:hidden items-center gap-3 text-gray-700">
-              <Link href="/products" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors" aria-label="Search">
+              <Link href="/products" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[var(--color-brand-soft)] transition-colors" aria-label="Search">
                 <Search size={18} />
               </Link>
               <MyAccountDropdown compact />
-              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors" aria-label="Contact Us">
+              <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[var(--color-brand-soft)] transition-colors" aria-label="Contact Us">
                 <Phone size={18} />
               </a>
-              <Link href="/cart" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[#f5f0e3] transition-colors relative" aria-label="Cart">
+              <Link href="/cart" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[var(--color-brand-soft)] transition-colors relative" aria-label="Cart">
                 <ShoppingBag size={18} />
                 <span className="absolute -top-1 -right-1 bg-[var(--color-brand-primary)] text-white text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
                   {cartCount}
@@ -133,15 +133,15 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
         <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-6 md:px-24 z-10 max-w-7xl mx-auto">
-          <p className="text-[#bda871] font-bold tracking-[0.3em] text-xs md:text-sm mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
+          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.3em] text-xs md:text-sm mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
           <h1 className="text-white font-serif text-4xl md:text-8xl mb-6 leading-tight drop-shadow-2xl">
-            A Scent Full Of <br /><span className="italic text-[#f4ebd0]">Elegance</span>
+            A Scent Full Of <br /><span className="italic text-[#d8e9ff]">Elegance</span>
           </h1>
           <p className="text-gray-300 max-w-md text-sm md:text-lg mb-10 leading-relaxed font-light">
             Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.
           </p>
           <Link href="/products">
-            <button className="group flex items-center gap-4 bg-[#bda871] text-white px-10 md:px-16 py-4 md:py-5 text-sm tracking-[0.2em] font-bold hover:bg-white hover:text-black transition-all duration-500 shadow-2xl">
+            <button className="group flex items-center gap-4 bg-[var(--color-brand-primary)] text-white px-10 md:px-16 py-4 md:py-5 text-sm tracking-[0.2em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
               EXPLORE COLLECTION <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
             </button>
           </Link>
@@ -164,7 +164,7 @@ export default function Home() {
                   key={i}
                   className="min-w-[46%] snap-start flex flex-col items-center group"
                 >
-                  <div className="w-full aspect-square rounded-2xl bg-[#fdf8f4] flex items-center justify-center mb-3 transition-all duration-500 group-hover:bg-[#f9eee4] group-hover:shadow-md group-hover:-translate-y-1">
+                  <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] flex items-center justify-center mb-3 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
                     <div className="w-10 h-10 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
                       <Image
                         src={cat.icon}
@@ -186,7 +186,7 @@ export default function Home() {
           <div className="hidden md:grid md:grid-cols-5 gap-x-6 gap-y-12">
             {categories.map((cat, i) => (
               <Link href={`/products?category=${cat.slug}`} key={i} className="flex flex-col items-center group">
-                <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[#fdf8f4] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#f9eee4] group-hover:shadow-md group-hover:-translate-y-1">
+                <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
                   <div className="w-10 h-10 md:w-16 md:h-16 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
                     <Image 
                       src={cat.icon} 
@@ -208,7 +208,7 @@ export default function Home() {
       <section className="py-20 md:py-32 max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
             <div className="max-w-xl text-left">
-                <h2 className="text-4xl md:text-6xl font-serif text-[#2c2c2c] mb-4">Latest Viral <br /><span className="italic text-[var(--color-brand-primary)]">Launches</span></h2>
+                <h2 className="text-4xl md:text-6xl font-serif text-[var(--color-brand-text)] mb-4">Latest Viral <br /><span className="italic text-[var(--color-brand-primary)]">Launches</span></h2>
                 <p className="text-gray-500 text-sm md:text-base leading-relaxed font-light">The most loved scents of the season, now restocked and ready for you.</p>
             </div>
             <Link href="/products" className="text-xs font-bold tracking-widest text-black border-b-2 border-black pb-1 hover:text-[var(--color-brand-primary)] hover:border-[var(--color-brand-primary)] transition-all">
@@ -266,7 +266,7 @@ export default function Home() {
             <p className="text-gray-300 max-w-lg text-sm md:text-base font-light italic leading-loose">
                 "Fragrance is the first layer of personality. It's the invisible accessory that announces your arrival and delays your departure."
             </p>
-            <div className="mt-8 h-12 w-[1px] bg-[#bda871]"></div>
+            <div className="mt-8 h-12 w-[1px] bg-[var(--color-brand-primary)]"></div>
          </div>
       </section>
 

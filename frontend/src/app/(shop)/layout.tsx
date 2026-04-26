@@ -3,9 +3,9 @@ import Image from "next/image";
 import Link from 'next/link';
 
 const Navbar = () => (
-  <header className="sticky top-0 z-50 bg-[#fdfbf6]/90 backdrop-blur-md border-b border-[#e6e4dc]">
+  <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[var(--color-brand-border)]">
     {/* Top notification bar */}
-    <div className="bg-[#bda871] text-white text-xs text-center py-2 font-medium tracking-wide">
+    <div className="bg-[var(--color-brand-primary)] text-white text-xs text-center py-2 font-medium tracking-wide">
       EXTRA 5% OFF | USE CODE: SCENTOFDOON | STORE LOCATOR
     </div>
     

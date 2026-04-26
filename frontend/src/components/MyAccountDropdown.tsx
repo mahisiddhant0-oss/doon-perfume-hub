@@ -148,7 +148,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
             animate="visible"
             exit="exit"
             transition={{ duration: 0.18 }}
-            className="absolute right-0 mt-3 w-[min(320px,calc(100vw-1.5rem))] bg-white border border-[#e6e4dc] shadow-xl p-4 z-[60]"
+            className="absolute right-0 mt-3 w-[min(320px,calc(100vw-1.5rem))] bg-white border border-[var(--color-brand-border)] shadow-xl p-4 z-[60]"
           >
             {user ? (
               <>
@@ -157,18 +157,18 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
                   <p className="text-xs text-gray-500">{user.phone || user.email}</p>
                 </div>
                 <div className="flex flex-col text-sm">
-                  <Link href="/my-orders" className="flex items-center gap-2 px-2 py-2 hover:bg-[#f8f6f1] transition-colors">
+                  <Link href="/my-orders" className="flex items-center gap-2 px-2 py-2 hover:bg-[var(--color-brand-soft)] transition-colors">
                     <Package size={15} /> My Orders
                   </Link>
-                  <a href="mailto:admin@doonperfumehub.com" className="flex items-center gap-2 px-2 py-2 hover:bg-[#f8f6f1] transition-colors">
+                  <a href="mailto:admin@doonperfumehub.com" className="flex items-center gap-2 px-2 py-2 hover:bg-[var(--color-brand-soft)] transition-colors">
                     <Phone size={15} /> Contact Us
                   </a>
-                  <Link href="/settings" className="flex items-center gap-2 px-2 py-2 hover:bg-[#f8f6f1] transition-colors">
+                  <Link href="/settings" className="flex items-center gap-2 px-2 py-2 hover:bg-[var(--color-brand-soft)] transition-colors">
                     <Settings size={15} /> Settings
                   </Link>
                   <button
                     onClick={logout}
-                    className="flex items-center gap-2 px-2 py-2 hover:bg-[#f8f6f1] transition-colors text-left"
+                    className="flex items-center gap-2 px-2 py-2 hover:bg-[var(--color-brand-soft)] transition-colors text-left"
                   >
                     <LogOut size={15} /> Logout
                   </button>
@@ -196,7 +196,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
                 {message && <p className="text-xs text-green-600">{message}</p>}
                 {error && <p className="text-xs text-red-600">{error}</p>}
                 {devOtp && (
-                  <p className="text-[11px] text-[#bda871]">
+                  <p className="text-[11px] text-[var(--color-brand-primary)]">
                     Dev OTP: <span className="font-semibold">{devOtp}</span>
                   </p>
                 )}

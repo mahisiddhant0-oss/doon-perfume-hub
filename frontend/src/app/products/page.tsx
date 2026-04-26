@@ -161,8 +161,8 @@ function ProductsPageContent() {
 
   return (
     <div>
-      <header className="sticky top-0 z-50 bg-[#fdfbf6]/95 backdrop-blur-md border-b border-[#e6e4dc]">
-        <div className="bg-[#bda871] text-white text-xs text-center py-2 font-medium tracking-wide">
+      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-brand-border)]">
+        <div className="bg-[var(--color-brand-primary)] text-white text-xs text-center py-2 font-medium tracking-wide">
           EXTRA 5% OFF | USE CODE: SCENTOFDOON | STORE LOCATOR
         </div>
 
@@ -202,7 +202,7 @@ function ProductsPageContent() {
                 </span>
               </Link>
 
-              <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 mt-3 w-96 max-h-[420px] overflow-y-auto bg-white border border-[#e6e4dc] shadow-2xl p-5">
+              <div className="invisible opacity-0 group-hover:visible group-hover:opacity-100 transition-all duration-200 absolute right-0 mt-3 w-96 max-h-[420px] overflow-y-auto bg-white border border-[var(--color-brand-border)] shadow-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-serif text-xl text-gray-900">Your Cart</h3>
                   <span className="text-xs tracking-widest uppercase text-gray-400">{cartCount} Items</span>
@@ -299,7 +299,7 @@ function ProductsPageContent() {
                     onClick={() => setSelectedCategory(cat.value)}
                     className={`w-full text-left px-2 py-1 rounded transition-colors ${
                       selectedCategory === cat.value
-                        ? 'text-[var(--color-brand-primary)] font-semibold bg-[#faf6ef]'
+                        ? 'text-[var(--color-brand-primary)] font-semibold bg-[var(--color-brand-soft)]'
                         : 'hover:text-[var(--color-brand-primary)]'
                     }`}
                   >
@@ -337,7 +337,7 @@ function ProductsPageContent() {
         {/* Product Grid */}
         <div className="flex-1">
           {loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {[...Array(9)].map((_, i) => (
                 <div key={i} className="bg-white animate-pulse">
                   <div className="aspect-[4/5] bg-gray-200" />
@@ -367,7 +367,7 @@ function ProductsPageContent() {
           {!loading && !error && products.length > 0 && (
             <>
               <p className="text-sm text-gray-400 mb-6">{products.length} products found</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {products.map((product) => (
                   <Link
                     href={`/products/${product._id}`}
@@ -391,9 +391,9 @@ function ProductsPageContent() {
                         </div>
                       )}
                     </div>
-                    <div className="p-5 text-center flex flex-col flex-grow">
+                    <div className="p-3 sm:p-5 text-center flex flex-col flex-grow">
                       <span className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{product.category.replace('-', ' ')}</span>
-                      <h3 className="font-serif text-base text-gray-900 mb-2 leading-snug">{product.name}</h3>
+                      <h3 className="font-serif text-sm sm:text-base text-gray-900 mb-2 leading-snug">{product.name}</h3>
                       <p className="text-gray-700 font-medium mb-4">
                         {product.variants.length > 0
                           ? `From ₹${Math.min(...product.variants.map(v => v.price)).toLocaleString('en-IN')}`
@@ -419,7 +419,7 @@ function ProductsPageContent() {
 
 export default function ProductsPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#fcfcfc]" />}>
+    <Suspense fallback={<div className="min-h-screen bg-[var(--color-brand-bg)]" />}>
       <ProductsPageContent />
     </Suspense>
   );

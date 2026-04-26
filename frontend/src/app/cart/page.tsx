@@ -65,7 +65,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="bg-[#fcfcfc] min-h-screen pt-8 pb-32">
+    <div className="bg-[var(--color-brand-bg)] min-h-screen pt-8 pb-32">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-4 mb-12">
             <h1 className="text-4xl font-serif text-gray-900">Your Bag</h1>
@@ -168,7 +168,7 @@ export default function CartPage() {
               </div>
               
               <Link href="/checkout">
-                <button className="w-full bg-black text-white h-16 flex items-center justify-center gap-4 text-xs font-bold tracking-[0.2em] hover:bg-[#bda871] transition-all duration-500 shadow-2xl">
+                <button className="w-full bg-black text-white h-16 flex items-center justify-center gap-4 text-xs font-bold tracking-[0.2em] hover:bg-[var(--color-brand-primary)] transition-all duration-500 shadow-2xl">
                     PROCEED TO CHECKOUT <ArrowRight size={18} />
                 </button>
               </Link>
@@ -178,7 +178,7 @@ export default function CartPage() {
                     <ShieldCheck size={18} className="text-[var(--color-brand-primary)] flex-shrink-0" />
                     <span>Secure multi-layer encryption</span>
                 </div>
-                <div className="bg-[#fdfbf6] p-4 rounded border border-[#f4ebd0] text-[10px] text-[#bda871] leading-relaxed uppercase tracking-wider font-bold">
+                <div className="bg-[var(--color-brand-soft)] p-4 rounded border border-[var(--color-brand-border)] text-[10px] text-[var(--color-brand-primary)] leading-relaxed uppercase tracking-wider font-bold">
                     Note: Complimentary sample included with orders above Rs. 5,000
                 </div>
               </div>
