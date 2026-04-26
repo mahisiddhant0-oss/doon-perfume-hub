@@ -236,7 +236,13 @@ const verifyPayment = async (req, res) => {
 // @access  Private
 const getMyOrders = async (req, res) => {
   try {
-    const orders = await Order.find({ user: req.user._id }).sort({ createdAt: -1 }).populate('items.product', 'name images');
+    const orders = await Order.find({
+      user: req.user._id,
+      paymentStatus: 'paid',
+      orderStatus: { $in: ['processing', 'shipped', 'delivered'] },
+    })
+      .sort({ createdAt: -1 })
+      .populate('items.product', 'name images');
 
     res.json(orders);
   } catch (error) {
