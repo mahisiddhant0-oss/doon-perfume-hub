@@ -7,15 +7,18 @@ const connectSources = [
   apiUrl,
   isDev ? 'http://localhost:5000' : '',
   isDev ? 'http://127.0.0.1:5000' : '',
+  'https://www.google-analytics.com',
+  'https://region1.google-analytics.com',
+  'https://www.googletagmanager.com',
   'https://api.razorpay.com',
   'https://checkout.razorpay.com',
 ].filter(Boolean).join(' ');
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval' " : ''}https://checkout.razorpay.com`,
+  `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval' " : ''}https://checkout.razorpay.com https://www.googletagmanager.com`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://static.wixstatic.com",
+  "img-src 'self' data: blob: https://images.unsplash.com https://static.wixstatic.com https://www.google-analytics.com",
   `connect-src ${connectSources}`,
   "font-src 'self' data:",
   "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com",
