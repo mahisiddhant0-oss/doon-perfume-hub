@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import Script from "next/script";
+import { Suspense } from "react";
 import "./globals.css";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 
@@ -76,7 +77,9 @@ export default function RootLayout({
                 gtag('config', '${gaMeasurementId}', { send_page_view: false });
               `}
             </Script>
-            <GoogleAnalytics measurementId={gaMeasurementId} />
+            <Suspense fallback={null}>
+              <GoogleAnalytics measurementId={gaMeasurementId} />
+            </Suspense>
           </>
         ) : null}
         {children}
