@@ -152,6 +152,41 @@ export default function AdminProducts() {
     }
   };
 
+  const handleDeleteProduct = async (product: AdminProduct) => {
+    const isConfirmed = window.confirm(
+      `Are you sure you want to permanently delete "${product.name}"?\n\nThis cannot be undone.`
+    );
+    if (!isConfirmed) {
+      return;
+    }
+
+    try {
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (!token) {
+        alert('Please login as admin to delete products.');
+        return;
+      }
+
+      const res = await fetch(`${API_ROUTES.PRODUCTS}/${product._id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        throw new Error(payload?.message || 'Failed to delete product');
+      }
+
+      await fetchProducts();
+      alert('Product deleted permanently.');
+    } catch (error: any) {
+      alert(error?.message || 'Failed to delete product');
+    }
+  };
+
   const addVariant = () => {
     setFormData((prev) => ({
       ...prev,
@@ -312,7 +347,11 @@ export default function AdminProducts() {
                     <button onClick={() => handleOpenModal(product)} className="p-2 text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-lg transition-all" title="Edit Listing">
                       <Edit2 size={16} />
                     </button>
-                    <button className="p-2 text-[#888] hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all" title="Deactivate">
+                    <button
+                      onClick={() => handleDeleteProduct(product)}
+                      className="p-2 text-[#888] hover:text-red-500 hover:bg-red-500/5 rounded-lg transition-all"
+                      title="Delete Permanently"
+                    >
                       <Trash2 size={16} />
                     </button>
                   </div>

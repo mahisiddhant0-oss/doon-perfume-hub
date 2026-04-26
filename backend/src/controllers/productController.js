@@ -197,15 +197,13 @@ const updateProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
-
-    if (product) {
-      // Soft delete by marking it inactive instead of hard deleting
-      product.isActive = false;
-      await product.save();
-      res.json({ message: 'Product successfully deactivated' });
-    } else {
+    if (!product) {
       res.status(404).json({ message: 'Product not found' });
+      return;
     }
+
+    await Product.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Product permanently deleted' });
   } catch (error) {
     res.status(500).json({ message: 'Server Error deleting product' });
   }
