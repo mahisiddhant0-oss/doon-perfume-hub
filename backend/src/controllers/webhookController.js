@@ -49,6 +49,7 @@ const handleRazorpayWebhook = async (req, res) => {
     const paymentEntity = payload.payment.entity;
     const razorpayOrderId = paymentEntity.order_id;
     const razorpayPaymentId = paymentEntity.id;
+    const paymentMethod = paymentEntity.method || 'razorpay';
 
     try {
       const payment = await Payment.findOne({ razorpay_order_id: razorpayOrderId });
@@ -63,6 +64,7 @@ const handleRazorpayWebhook = async (req, res) => {
 
       payment.razorpay_payment_id = razorpayPaymentId;
       payment.status = 'captured';
+      payment.paymentMethod = paymentMethod;
       await payment.save();
 
       const order = await Order.findById(payment.order).populate('user');
@@ -74,6 +76,7 @@ const handleRazorpayWebhook = async (req, res) => {
       if (order.paymentStatus !== 'paid') {
         order.paymentStatus = 'paid';
         order.orderStatus = 'processing';
+        order.paymentMethod = paymentMethod;
         await order.save();
 
         for (const item of order.items) {
@@ -89,6 +92,7 @@ const handleRazorpayWebhook = async (req, res) => {
           if (shipmentResult?.awbNumber) {
             order.awbNumber = shipmentResult.awbNumber;
             order.orderStatus = 'shipped';
+            order.logisticsStatus = 'in_transit';
             await order.save();
 
             await schedulePickup(order);

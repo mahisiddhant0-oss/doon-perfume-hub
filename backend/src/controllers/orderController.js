@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const Cart = require('../models/Cart');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const razorpayInstance = require('../config/razorpay');
 const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
@@ -78,6 +79,9 @@ const buildReceiptId = (userId) => {
   return `rcpt_${userChunk}_${timeChunk}`;
 };
 
+const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
+const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
+
 // @desc    Create new Order & corresponding Razorpay Order
 // @route   POST /api/orders
 // @access  Private
@@ -152,6 +156,7 @@ const createOrder = async (req, res) => {
       shippingAddress,
       orderStatus: 'pending',
       paymentStatus: 'pending',
+      paymentMethod: 'razorpay',
     });
 
     await Payment.create({
@@ -214,11 +219,13 @@ const verifyPayment = async (req, res) => {
       payment.razorpay_payment_id = razorpay_payment_id;
       payment.razorpay_signature = razorpay_signature;
       payment.status = 'captured';
+      payment.paymentMethod = payment.paymentMethod || 'razorpay';
       await payment.save();
 
       const order = await Order.findById(payment.order);
       order.paymentStatus = 'paid';
       order.orderStatus = 'processing';
+      order.paymentMethod = payment.paymentMethod || order.paymentMethod || 'razorpay';
       await order.save();
 
       await Cart.findOneAndUpdate({ user: req.user._id }, { items: [] });
@@ -238,6 +245,7 @@ const verifyPayment = async (req, res) => {
         if (shipmentResult?.awbNumber) {
           order.awbNumber = shipmentResult.awbNumber;
           order.orderStatus = 'shipped';
+          order.logisticsStatus = 'in_transit';
           await order.save();
 
           await schedulePickup(order);
@@ -263,6 +271,7 @@ const verifyPayment = async (req, res) => {
       await Order.findByIdAndUpdate(payment.order, {
         paymentStatus: 'failed',
         orderStatus: 'cancelled',
+        logisticsStatus: 'cancelled',
       });
     }
 
@@ -318,7 +327,7 @@ const getOrderById = async (req, res) => {
 // @access  Private/Admin
 const getAllOrders = async (req, res) => {
   try {
-    const orders = await Order.find({})
+    const orders = await Order.find({ paymentStatus: 'paid' })
       .sort({ createdAt: -1 })
       .populate('user', 'name email phone')
       .populate('items.product', 'name images');
@@ -340,6 +349,12 @@ const updateOrderStatus = async (req, res) => {
     if (order) {
       if (orderStatus) order.orderStatus = orderStatus;
       if (paymentStatus) order.paymentStatus = paymentStatus;
+      if (orderStatus === 'delivered') {
+        order.isFulfilled = true;
+        order.fulfilledAt = new Date();
+        order.deliveredAt = new Date();
+        order.logisticsStatus = 'delivered';
+      }
 
       const updatedOrder = await order.save();
       res.json(updatedOrder);
@@ -351,6 +366,120 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// @desc    Create custom manual paid order (Admin only)
+// @route   POST /api/orders/custom
+// @access  Private/Admin
+const createCustomOrder = async (req, res) => {
+  try {
+    const { customer, items, shippingAddress, paymentMethod } = req.body || {};
+
+    if (!customer?.email || !customer?.phone || !customer?.name) {
+      return res.status(400).json({ message: 'Customer name, email, and phone are required.' });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'At least one custom product item is required.' });
+    }
+
+    const normalizedItems = items.map((item) => {
+      const quantity = Number(item.quantity) || 0;
+      const price = Number(item.price) || 0;
+      const weightKg = Math.max(0, Number(item.weightKg) || 0);
+
+      if (!item.name || quantity < 1 || price < 0) {
+        throw new Error('Each item must include name, quantity >= 1 and valid price.');
+      }
+
+      const baseAmount = roundToTwo(quantity * price);
+      const gstAmount = roundToTwo(baseAmount * GST_RATE);
+      return {
+        name: String(item.name).trim(),
+        quantity,
+        price,
+        weightKg,
+        size: item.size ? String(item.size).trim() : undefined,
+        baseAmount,
+        gstAmount,
+        totalAmount: roundToTwo(baseAmount + gstAmount),
+      };
+    });
+
+    const subtotal = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.baseAmount, 0));
+    const gstAmount = roundToTwo(normalizedItems.reduce((acc, item) => acc + item.gstAmount, 0));
+    const totalWeightKg = roundWeight(normalizedItems.reduce((acc, item) => acc + item.weightKg * item.quantity, 0));
+    const shippingAmount = roundToTwo(totalWeightKg * SHIPPING_RATE_PER_KG);
+    const totalAmount = roundToTwo(subtotal + gstAmount + shippingAmount);
+
+    const email = normalizeEmail(customer.email);
+    const phone = normalizePhone(customer.phone);
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      user = await User.findOne({ phone });
+    }
+    if (!user) {
+      user = await User.create({
+        name: String(customer.name).trim(),
+        email,
+        phone,
+        isVerified: true,
+      });
+    }
+
+    const order = await Order.create({
+      user: user._id,
+      items: normalizedItems,
+      totalAmount,
+      subtotal,
+      gstAmount,
+      shippingAmount,
+      totalWeightKg,
+      shippingAddress: shippingAddress || {
+        firstName: String(customer.name).trim(),
+        lastName: '',
+        street: 'Custom order',
+        city: 'Custom',
+        state: 'Custom',
+        pincode: '000000',
+        phone,
+        country: 'India',
+      },
+      orderStatus: 'processing',
+      paymentStatus: 'paid',
+      paymentMethod: paymentMethod || 'manual',
+      logisticsStatus: 'pending',
+    });
+
+    await Payment.create({
+      order: order._id,
+      user: user._id,
+      razorpay_order_id: `manual_${order._id}_${Date.now()}`,
+      amount: totalAmount,
+      currency: 'INR',
+      status: 'captured',
+      paymentMethod: paymentMethod || 'manual',
+    });
+
+    try {
+      const shipmentResult = await createShipment(order);
+      if (shipmentResult?.awbNumber) {
+        order.awbNumber = shipmentResult.awbNumber;
+        order.orderStatus = 'shipped';
+        order.logisticsStatus = 'in_transit';
+        await order.save();
+        await schedulePickup(order);
+      }
+    } catch (logisticsError) {
+      console.error('Custom order logistics error:', logisticsError.message);
+    }
+
+    return res.status(201).json(order);
+  } catch (error) {
+    console.error('createCustomOrder error:', error.message);
+    return res.status(500).json({ message: error.message || 'Failed to create custom order.' });
+  }
+};
+
 module.exports = {
   createOrder,
   verifyPayment,
@@ -358,4 +487,5 @@ module.exports = {
   getOrderById,
   getAllOrders,
   updateOrderStatus,
+  createCustomOrder,
 };

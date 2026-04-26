@@ -6,7 +6,8 @@ const {
   getMyOrders,
   getOrderById,
   getAllOrders,
-  updateOrderStatus
+  updateOrderStatus,
+  createCustomOrder,
 } = require('../controllers/orderController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { orderValidation } = require('../middlewares/validationMiddleware');
@@ -26,5 +27,6 @@ router.get('/:id', protect, getOrderById);
 // Admin-only: Fetch all orders and update status
 router.get('/', protect, adminRights, getAllOrders);
 router.put('/:id/status', protect, adminRights, updateOrderStatus);
+router.post('/custom', protect, adminRights, createCustomOrder);
 
 module.exports = router;

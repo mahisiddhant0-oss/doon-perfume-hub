@@ -4,7 +4,7 @@ const orderItemSchema = new mongoose.Schema({
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: true
+    required: false
   },
   name: { type: String, required: true },
   quantity: { type: Number, required: true, min: 1 },
@@ -66,9 +66,27 @@ const orderSchema = new mongoose.Schema({
     enum: ['pending', 'paid', 'failed', 'refunded'],
     default: 'pending'
   },
+  paymentMethod: {
+    type: String,
+    default: 'razorpay'
+  },
   awbNumber: {
     type: String, // For Delhivery tracking mapping
     trim: true
+  },
+  logisticsStatus: {
+    type: String,
+    default: 'pending'
+  },
+  isFulfilled: {
+    type: Boolean,
+    default: false
+  },
+  fulfilledAt: {
+    type: Date
+  },
+  deliveredAt: {
+    type: Date
   }
 }, { timestamps: true });
 
