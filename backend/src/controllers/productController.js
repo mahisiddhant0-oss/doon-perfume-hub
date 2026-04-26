@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const ProductCategory = require('../models/ProductCategory');
 const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
 const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
@@ -13,6 +14,7 @@ const normalizeWeightKg = (value) => {
 
 const normalizeSku = (value = '') => String(value || '').trim();
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
+const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
 
 const normalizeCategories = (category, categories) => {
   const fromArray = Array.isArray(categories)
@@ -35,6 +37,74 @@ const normalizeCategories = (category, categories) => {
   });
 
   return uniqueCategories.length > 0 ? uniqueCategories : ['general'];
+};
+
+const upsertCategories = async (categories = []) => {
+  const normalized = normalizeCategories('', categories);
+  if (normalized.length === 0) return;
+  await ProductCategory.bulkWrite(
+    normalized.map((value) => ({
+      updateOne: {
+        filter: { value: String(value).toLowerCase() },
+        update: { $setOnInsert: { value: String(value).toLowerCase() } },
+        upsert: true,
+      },
+    })),
+    { ordered: false }
+  );
+};
+
+const getProductCategories = async (req, res) => {
+  try {
+    await upsertCategories(DEFAULT_CATEGORY_VALUES);
+
+    const categoryDocs = await ProductCategory.find({}, { value: 1, _id: 0 }).lean();
+    const fromProductsCategories = await Product.distinct('categories');
+    const fromProductsPrimary = await Product.distinct('category');
+
+    const merged = [
+      ...DEFAULT_CATEGORY_VALUES,
+      ...categoryDocs.map((doc) => doc.value),
+      ...fromProductsCategories,
+      ...fromProductsPrimary,
+    ]
+      .map((entry) => String(entry || '').trim().toLowerCase())
+      .filter(Boolean)
+      .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry));
+
+    const unique = Array.from(new Set(merged));
+    res.json(unique);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error fetching categories', error: error.message });
+  }
+};
+
+const createProductCategory = async (req, res) => {
+  try {
+    const rawValue = String(req.body?.value || '').trim().toLowerCase();
+    if (!rawValue) {
+      return res.status(400).json({ message: 'Category value is required' });
+    }
+    if (EXCLUDED_CATEGORY_VALUES.has(rawValue)) {
+      return res.status(400).json({ message: 'This category is not allowed' });
+    }
+    if (rawValue.length > 80) {
+      return res.status(400).json({ message: 'Category is too long' });
+    }
+
+    const doc = await ProductCategory.findOneAndUpdate(
+      { value: rawValue },
+      { $setOnInsert: { value: rawValue } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    return res.status(201).json({ value: doc.value });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(200).json({ value: String(req.body?.value || '').trim().toLowerCase() });
+    }
+    res.status(500).json({ message: 'Server Error creating category', error: error.message });
+  }
 };
 
 const normalizeVariants = (variants = []) => {
@@ -198,6 +268,7 @@ const createProduct = async (req, res) => {
     });
 
     const createdProduct = await product.save();
+    await upsertCategories(normalizedCategories);
     res.status(201).json(createdProduct);
   } catch (error) {
     if (error?.code === 11000) {
@@ -231,6 +302,7 @@ const updateProduct = async (req, res) => {
         );
         product.category = normalizedCategories[0];
         product.categories = normalizedCategories;
+        await upsertCategories(normalizedCategories);
       }
       product.stock = stock !== undefined ? stock : product.stock;
       product.weightKg = weightKg !== undefined ? normalizeWeightKg(weightKg) : product.weightKg;
@@ -276,6 +348,8 @@ const deleteProduct = async (req, res) => {
 };
 
 module.exports = {
+  getProductCategories,
+  createProductCategory,
   getProducts,
   getProductById,
   createProduct,

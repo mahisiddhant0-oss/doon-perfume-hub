@@ -13,6 +13,7 @@ export const API_BASE =
 export const API_ROUTES = {
   AUTH: `${API_BASE}/api/auth`,
   PRODUCTS: `${API_BASE}/api/products`,
+  PRODUCT_CATEGORIES: `${API_BASE}/api/products/categories`,
   CART: `${API_BASE}/api/cart`,
   ORDERS: `${API_BASE}/api/orders`,
   LOGISTICS: `${API_BASE}/api/logistics`,

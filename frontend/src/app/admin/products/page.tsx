@@ -61,8 +61,6 @@ const CATEGORY_OPTIONS = [
   { value: 'bottles', label: 'Glass Bottles' },
 ];
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
-const CUSTOM_CATEGORY_VALUE = '__custom_category__';
-const ADMIN_CUSTOM_CATEGORY_POOL_KEY = 'admin_custom_category_pool_v1';
 
 const emptyForm: ProductForm = {
   name: '',
@@ -126,24 +124,28 @@ export default function AdminProducts() {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      const separator = API_ROUTES.PRODUCT_CATEGORIES.includes('?') ? '&' : '?';
+      const res = await fetch(`${API_ROUTES.PRODUCT_CATEGORIES}${separator}_ts=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) return;
+      const payload = await res.json();
+      const normalized = Array.isArray(payload)
+        ? payload
+            .map((entry) => String(entry || '').trim().toLowerCase())
+            .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
+        : [];
+      setCustomCategoryPool((prev) => mergeCategoryValues(prev, normalized));
+    } catch {
+      // fallback to product-derived categories
+    }
+  };
+
   useEffect(() => {
     fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const rawStored = window.localStorage.getItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY);
-    if (!rawStored) return;
-
-    try {
-      const parsed = JSON.parse(rawStored);
-      if (Array.isArray(parsed)) {
-        setCustomCategoryPool(mergeCategoryValues(parsed as string[]));
-      }
-    } catch {
-      window.localStorage.removeItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY);
-    }
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -168,24 +170,8 @@ export default function AdminProducts() {
       })
       .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
 
-    setCustomCategoryPool((prevPool) => {
-      const nextPool = mergeCategoryValues(prevPool, categoriesFromProducts);
-      const changed =
-        nextPool.length !== prevPool.length ||
-        nextPool.some((entry, index) => entry !== prevPool[index]);
-
-      if (changed && typeof window !== 'undefined') {
-        window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
-      }
-
-      return changed ? nextPool : prevPool;
-    });
+    setCustomCategoryPool((prevPool) => mergeCategoryValues(prevPool, categoriesFromProducts));
   }, [products]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(customCategoryPool));
-  }, [customCategoryPool]);
 
   const handleOpenModal = (product: AdminProduct | null = null) => {
     if (product) {
@@ -267,9 +253,6 @@ export default function AdminProducts() {
         );
         const nextPool = mergeCategoryValues(customCategoryPool, categoriesFromSavedProduct);
         setCustomCategoryPool(nextPool);
-        if (typeof window !== 'undefined') {
-          window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
-        }
 
         // Keep UI in sync instantly for both Create and Edit flows.
         if (savedProduct?._id) {
@@ -286,6 +269,7 @@ export default function AdminProducts() {
         setIsCreatingCustomCategory(false);
         setCustomCategoryInput('');
         fetchProducts();
+        fetchCategories();
       } else {
         const errData = await res.json();
         const detailedMessage = [errData?.message, errData?.error].filter(Boolean).join(': ');
@@ -406,31 +390,46 @@ export default function AdminProducts() {
     [customCategoryOptions, customCategoryPool, formData.categories]
   );
 
-  const addCustomCategoryToForm = () => {
+  const addCustomCategoryToForm = async () => {
     const typedCategory = customCategoryInput.trim();
     if (!typedCategory) {
       return;
     }
-
-    const nextPool = mergeCategoryValues(customCategoryPool, [typedCategory]);
-    setCustomCategoryPool(nextPool);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(ADMIN_CUSTOM_CATEGORY_POOL_KEY, JSON.stringify(nextPool));
+    const normalizedCategory = typedCategory.toLowerCase();
+    try {
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (token) {
+        await fetch(API_ROUTES.PRODUCT_CATEGORIES, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ value: normalizedCategory }),
+        });
+      }
+    } catch {
+      // If this fails, keep it in current form as fallback.
     }
 
+    const nextPool = mergeCategoryValues(customCategoryPool, [normalizedCategory]);
+    setCustomCategoryPool(nextPool);
+
     setFormData((prev) => {
-      const nextCategories = mergeCategoryValues(prev.categories, [typedCategory]);
+      const nextCategories = mergeCategoryValues(prev.categories, [normalizedCategory]);
       if (nextCategories.length === prev.categories.length) {
         return prev;
       }
       return {
         ...prev,
-        category: nextCategories[0] || typedCategory,
+        category: nextCategories[0] || normalizedCategory,
         categories: nextCategories,
       };
     });
     setCustomCategoryInput('');
     setIsCreatingCustomCategory(false);
+    fetchCategories();
   };
 
   const toggleCategorySelection = (categoryValue: string) => {

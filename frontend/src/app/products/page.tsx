@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useMemo, useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { SlidersHorizontal, Search, ShoppingBag, X } from 'lucide-react';
 import { API_ROUTES } from '@/lib/api';
@@ -36,13 +36,13 @@ interface CartItem {
   category?: string;
 }
 
-const CATEGORIES = [
-  { label: 'All', value: '' },
+const DEFAULT_CATEGORY_OPTIONS = [
   { label: 'Perfumes', value: 'perfumes' },
   { label: 'Essential Oils', value: 'essential-oils' },
   { label: 'Bottles', value: 'bottles' },
   { label: 'General', value: 'general' },
 ];
+const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 
 const MAX_SEARCH_INPUT_LENGTH = 2000;
 const MAX_SEARCH_QUERY_LENGTH = 120;
@@ -69,9 +69,41 @@ function getPrimaryCategory(product: Product): string {
   return String(product.category || 'general');
 }
 
+function getProductCategories(product: Product): string[] {
+  const rawCategories =
+    Array.isArray(product.categories) && product.categories.length > 0
+      ? product.categories
+      : [product.category];
+
+  return rawCategories
+    .map((entry) => String(entry || '').trim())
+    .filter((entry) => entry.length > 0);
+}
+
+function formatCategoryLabel(value: string) {
+  const knownLabels: Record<string, string> = {
+    perfumes: 'Perfumes',
+    'essential-oils': 'Essential Oils',
+    bottles: 'Bottles',
+    general: 'General',
+  };
+
+  const normalized = String(value || '').trim();
+  if (!normalized) return 'General';
+  if (knownLabels[normalized.toLowerCase()]) {
+    return knownLabels[normalized.toLowerCase()];
+  }
+
+  return normalized
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 function ProductsPageContent() {
   const searchParams = useSearchParams();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categorySourceProducts, setCategorySourceProducts] = useState<Product[]>([]);
+  const [backendCategories, setBackendCategories] = useState<string[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -79,12 +111,47 @@ function ProductsPageContent() {
   const [search, setSearch] = useState('');
   const [priceFilter, setPriceFilter] = useState('');
   const safeSearchKeyword = normalizeSearchKeyword(search);
+  const categoryOptions = useMemo(() => {
+    const map = new Map<string, { label: string; value: string }>();
+
+    for (const entry of DEFAULT_CATEGORY_OPTIONS) {
+      map.set(entry.value.toLowerCase(), entry);
+    }
+
+    for (const product of categorySourceProducts) {
+      for (const value of getProductCategories(product)) {
+        if (!value) continue;
+        const key = value.toLowerCase();
+        if (EXCLUDED_CATEGORY_VALUES.has(key)) continue;
+        if (!map.has(key)) {
+          map.set(key, {
+            value,
+            label: formatCategoryLabel(value),
+          });
+        }
+      }
+    }
+
+    for (const value of backendCategories) {
+      if (!value) continue;
+      const key = value.toLowerCase();
+      if (EXCLUDED_CATEGORY_VALUES.has(key)) continue;
+      if (!map.has(key)) {
+        map.set(key, {
+          value,
+          label: formatCategoryLabel(value),
+        });
+      }
+    }
+
+    return [{ label: 'All', value: '' }, ...Array.from(map.values())];
+  }, [categorySourceProducts, backendCategories]);
 
   useEffect(() => {
     const categoryFromUrl = searchParams.get('category') || '';
     const keywordFromUrl = searchParams.get('keyword') || '';
 
-    setSelectedCategory(categoryFromUrl);
+    setSelectedCategory(EXCLUDED_CATEGORY_VALUES.has(categoryFromUrl.toLowerCase()) ? '' : categoryFromUrl);
     setSearch(keywordFromUrl.slice(0, MAX_SEARCH_INPUT_LENGTH));
   }, [searchParams]);
 
@@ -105,6 +172,45 @@ function ProductsPageContent() {
     return () => {
       window.removeEventListener('storage', loadCart);
     };
+  }, []);
+
+  useEffect(() => {
+    const fetchBackendCategories = async () => {
+      try {
+        const separator = API_ROUTES.PRODUCT_CATEGORIES.includes('?') ? '&' : '?';
+        const res = await fetch(`${API_ROUTES.PRODUCT_CATEGORIES}${separator}_ts=${Date.now()}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const normalized = Array.isArray(payload)
+          ? payload
+              .map((entry) => String(entry || '').trim().toLowerCase())
+              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
+          : [];
+        setBackendCategories(Array.from(new Set(normalized)));
+      } catch {
+        // Use product-derived category fallback.
+      }
+    };
+    fetchBackendCategories();
+  }, []);
+
+  useEffect(() => {
+    const fetchCategorySourceProducts = async () => {
+      try {
+        const separator = API_ROUTES.PRODUCTS.includes('?') ? '&' : '?';
+        const res = await fetch(`${API_ROUTES.PRODUCTS}${separator}_ts=${Date.now()}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const payload = await res.json();
+        const data: Product[] = Array.isArray(payload) ? payload : [];
+        setCategorySourceProducts(data);
+      } catch {
+        // Keep default categories only if this fails.
+      }
+    };
+
+    fetchCategorySourceProducts();
   }, []);
 
   useEffect(() => {
@@ -150,6 +256,9 @@ function ProductsPageContent() {
         else if (priceFilter === 'above5000') filtered = data.filter(p => p.price > 5000);
 
         setProducts(filtered);
+        if (categorySourceProducts.length === 0) {
+          setCategorySourceProducts(data);
+        }
       } catch (err: any) {
         setError(err?.message || 'Something went wrong');
       } finally {
@@ -158,7 +267,7 @@ function ProductsPageContent() {
     };
 
     fetchProducts();
-  }, [selectedCategory, safeSearchKeyword, priceFilter]);
+  }, [selectedCategory, safeSearchKeyword, priceFilter, categorySourceProducts.length]);
 
   const cartCount = cartItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
   const cartSubtotal = cartItems.reduce((sum, item) => sum + ((item.price || 0) * (item.quantity || 0)), 0);
@@ -303,7 +412,7 @@ function ProductsPageContent() {
 
             <h4 className="text-xs font-bold tracking-widest text-gray-500 uppercase mb-3">Category</h4>
             <ul className="space-y-2 mb-6 text-sm text-gray-600">
-              {CATEGORIES.map(cat => (
+              {categoryOptions.map(cat => (
                 <li key={cat.value}>
                   <button
                     onClick={() => setSelectedCategory(cat.value)}
