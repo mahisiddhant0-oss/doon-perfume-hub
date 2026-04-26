@@ -9,6 +9,45 @@ import { API_ROUTES, getAuthToken } from '@/lib/api';
 
 const GST_RATE = 0.18;
 
+const INDIA_STATES_AND_UTS = [
+  'Andhra Pradesh',
+  'Arunachal Pradesh',
+  'Assam',
+  'Bihar',
+  'Chhattisgarh',
+  'Goa',
+  'Gujarat',
+  'Haryana',
+  'Himachal Pradesh',
+  'Jharkhand',
+  'Karnataka',
+  'Kerala',
+  'Madhya Pradesh',
+  'Maharashtra',
+  'Manipur',
+  'Meghalaya',
+  'Mizoram',
+  'Nagaland',
+  'Odisha',
+  'Punjab',
+  'Rajasthan',
+  'Sikkim',
+  'Tamil Nadu',
+  'Telangana',
+  'Tripura',
+  'Uttar Pradesh',
+  'Uttarakhand',
+  'West Bengal',
+  'Andaman and Nicobar Islands',
+  'Chandigarh',
+  'Dadra and Nagar Haveli and Daman and Diu',
+  'Delhi',
+  'Jammu and Kashmir',
+  'Ladakh',
+  'Lakshadweep',
+  'Puducherry',
+];
+
 const roundToTwo = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 export default function CheckoutPage() {
@@ -191,9 +230,11 @@ export default function CheckoutPage() {
                 <label className="block text-xs font-semibold text-gray-700 tracking-wider mb-2">STATE</label>
                 <select required name="state" value={address.state} onChange={handleChange} className="w-full border border-gray-300 p-3 text-sm focus:outline-none focus:border-[var(--color-brand-primary)] transition-colors bg-white">
                   <option value="">Select State</option>
-                  <option value="Uttarakhand">Uttarakhand</option>
-                  <option value="Delhi">Delhi</option>
-                  <option value="Maharashtra">Maharashtra</option>
+                  {INDIA_STATES_AND_UTS.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
