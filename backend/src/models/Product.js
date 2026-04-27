@@ -4,7 +4,8 @@ const variantSchema = new mongoose.Schema({
   label: { type: String, required: true }, // e.g. '100ml', '250ml', '500ml'
   price: { type: Number, required: true, min: 0 },
   stock: { type: Number, default: 100, min: 0 },
-  weight: { type: Number, default: 0 } // in kg
+  weight: { type: Number, default: 0 }, // in kg
+  image: { type: String, default: '' },
 }, { _id: false });
 
 const productSchema = new mongoose.Schema({

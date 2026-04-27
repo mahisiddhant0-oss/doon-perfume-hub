@@ -118,6 +118,7 @@ const normalizeVariants = (variants = []) => {
       const price = Number(variant?.price);
       const stock = Number(variant?.stock);
       const weight = Number(variant?.weight);
+      const image = String(variant?.image || '').trim();
 
       if (!label || !Number.isFinite(price) || price < 0) {
         return null;
@@ -128,6 +129,7 @@ const normalizeVariants = (variants = []) => {
         price,
         stock: Number.isFinite(stock) && stock >= 0 ? stock : 0,
         weight: Number.isFinite(weight) && weight >= 0 ? weight : 0,
+        image,
       };
     })
     .filter(Boolean);

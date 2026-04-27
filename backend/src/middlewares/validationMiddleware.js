@@ -74,6 +74,7 @@ const productValidation = [
   body('variants.*.price').optional().isNumeric().withMessage('Variant price must be a number').custom((v) => v >= 0).withMessage('Variant price cannot be negative'),
   body('variants.*.stock').optional().isNumeric().withMessage('Variant stock must be a number').custom((v) => v >= 0).withMessage('Variant stock cannot be negative'),
   body('variants.*.weight').optional().isNumeric().withMessage('Variant weight must be a number').custom((v) => v >= 0).withMessage('Variant weight cannot be negative'),
+  body('variants.*.image').optional({ values: 'falsy' }).trim().isLength({ max: 2000 }).withMessage('Variant image URL is too long'),
   body('description').optional().trim().isLength({ max: 5000 }).withMessage('Description is too long'),
   validate,
 ];
