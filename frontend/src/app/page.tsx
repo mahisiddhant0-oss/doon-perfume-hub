@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Star, Search, Phone, ShoppingBag } from 'lucide-react';
 import { API_ROUTES } from '@/lib/api';
 import MyAccountDropdown from '@/components/MyAccountDropdown';
@@ -19,6 +20,7 @@ interface Product {
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
+const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const CATEGORY_ICON_MAP: Record<string, string> = {
   general: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   perfumes: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png',
@@ -48,16 +50,16 @@ const formatCategoryLabel = (value: string) =>
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
 export default function Home() {
+  const router = useRouter();
   const [viralLaunches, setViralLaunches] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [backendCategories, setBackendCategories] = useState<string[]>([]);
+  const [storedCustomCategories, setStoredCustomCategories] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [mobileCategorySlideIndex, setMobileCategorySlideIndex] = useState(0);
-  const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
+  const [mobileSearchKeyword, setMobileSearchKeyword] = useState('');
   const desktopCategorySliderRef = useRef<HTMLDivElement | null>(null);
-  const mobileTouchStartXRef = useRef<number | null>(null);
-  const mobileTouchDeltaXRef = useRef(0);
+  const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
 
   const categories = useMemo(() => {
     const map = new Map<string, { name: string; icon: string; slug: string }>();
@@ -84,7 +86,7 @@ export default function Home() {
       }
     }
 
-    for (const categoryValue of backendCategories) {
+    for (const categoryValue of [...backendCategories, ...storedCustomCategories]) {
       const normalized = String(categoryValue || '').trim().toLowerCase();
       if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
       if (!map.has(normalized)) {
@@ -100,9 +102,9 @@ export default function Home() {
       { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '' },
       ...Array.from(map.values()),
     ];
-  }, [allProducts, backendCategories]);
+  }, [allProducts, backendCategories, storedCustomCategories]);
 
-  const mobileCategoryColumns = useMemo(() => {
+  const categoryColumns = useMemo(() => {
     const columns: Array<Array<(typeof categories)[number] | null>> = [];
     for (let index = 0; index < categories.length; index += 2) {
       const top = categories[index] || null;
@@ -110,38 +112,6 @@ export default function Home() {
       columns.push([top, bottom]);
     }
     return columns;
-  }, [categories]);
-
-  const mobileCategorySlides = useMemo(() => {
-    const columnsPerSlide = 3; // 3 columns x 2 rows = 6 categories per swipe page
-    const slides: Array<Array<Array<(typeof categories)[number] | null>>> = [];
-    for (let index = 0; index < mobileCategoryColumns.length; index += columnsPerSlide) {
-      const slice = mobileCategoryColumns.slice(index, index + columnsPerSlide);
-      const padded = [
-        ...slice,
-        ...Array(Math.max(0, columnsPerSlide - slice.length)).fill([null, null]),
-      ] as Array<Array<(typeof categories)[number] | null>>;
-      slides.push(padded);
-    }
-    return slides;
-  }, [mobileCategoryColumns]);
-
-  useEffect(() => {
-    setMobileCategorySlideIndex((prev) => {
-      const maxIndex = Math.max(0, mobileCategorySlides.length - 1);
-      return Math.min(prev, maxIndex);
-    });
-  }, [mobileCategorySlides.length]);
-
-  const desktopCategorySlides = useMemo(() => {
-    const perSlide = 10;
-    const slides: Array<Array<(typeof categories)[number] | null>> = [];
-    for (let index = 0; index < categories.length; index += perSlide) {
-      const slice = categories.slice(index, index + perSlide);
-      const padded = [...slice, ...Array(Math.max(0, perSlide - slice.length)).fill(null)];
-      slides.push(padded);
-    }
-    return slides;
   }, [categories]);
 
   const handleCategoryRailMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -166,31 +136,11 @@ export default function Home() {
     event.currentTarget.dataset.dragging = 'false';
   };
 
-  const handleMobileTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
-    mobileTouchStartXRef.current = event.touches[0]?.clientX ?? null;
-    mobileTouchDeltaXRef.current = 0;
-  };
-
-  const handleMobileTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
-    const startX = mobileTouchStartXRef.current;
-    if (startX === null) return;
-    const currentX = event.touches[0]?.clientX ?? startX;
-    mobileTouchDeltaXRef.current = currentX - startX;
-  };
-
-  const handleMobileTouchEnd = () => {
-    const threshold = 40;
-    const delta = mobileTouchDeltaXRef.current;
-    const maxIndex = Math.max(0, mobileCategorySlides.length - 1);
-
-    if (delta < -threshold) {
-      setMobileCategorySlideIndex((prev) => Math.min(prev + 1, maxIndex));
-    } else if (delta > threshold) {
-      setMobileCategorySlideIndex((prev) => Math.max(prev - 1, 0));
-    }
-
-    mobileTouchStartXRef.current = null;
-    mobileTouchDeltaXRef.current = 0;
+  const handleMobileSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const keyword = mobileSearchKeyword.trim();
+    const target = keyword ? `/products?keyword=${encodeURIComponent(keyword)}` : '/products';
+    router.push(target);
   };
 
   useEffect(() => {
@@ -211,6 +161,32 @@ export default function Home() {
     window.addEventListener('storage', loadCartCount);
 
     return () => window.removeEventListener('storage', loadCartCount);
+  }, []);
+
+  useEffect(() => {
+    const loadStoredCustomCategories = () => {
+      try {
+        const raw = window.localStorage.getItem(LOCAL_CUSTOM_CATEGORIES_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const normalized = Array.isArray(parsed)
+          ? parsed
+              .map((entry) => String(entry || '').trim().toLowerCase())
+              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
+          : [];
+        setStoredCustomCategories(Array.from(new Set(normalized)));
+      } catch {
+        setStoredCustomCategories([]);
+      }
+    };
+
+    loadStoredCustomCategories();
+    window.addEventListener('storage', loadStoredCustomCategories);
+    window.addEventListener('focus', loadStoredCustomCategories);
+
+    return () => {
+      window.removeEventListener('storage', loadStoredCustomCategories);
+      window.removeEventListener('focus', loadStoredCustomCategories);
+    };
   }, []);
 
   useEffect(() => {
@@ -292,9 +268,6 @@ export default function Home() {
             </nav>
 
             <nav className="flex md:hidden items-center gap-3 text-gray-700">
-              <Link href="/products" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[var(--color-brand-soft)] transition-colors" aria-label="Search">
-                <Search size={18} />
-              </Link>
               <MyAccountDropdown compact />
               <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center justify-center h-9 w-9 rounded-full hover:bg-[var(--color-brand-soft)] transition-colors" aria-label="Contact Us">
                 <Phone size={18} />
@@ -311,7 +284,7 @@ export default function Home() {
       </header>
 
       {/* Hero Banner */}
-      <section className="relative w-full h-[35vh] md:h-[90vh] bg-black flex items-center overflow-hidden">
+      <section className="relative w-full h-[24vh] min-h-[280px] md:h-[90vh] bg-black flex items-center overflow-hidden">
         <Image
           src="https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=2000&q=80"
           alt="Hero Banner"
@@ -322,17 +295,17 @@ export default function Home() {
         />
         <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
         <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-6 md:px-24 z-10 max-w-7xl mx-auto">
-          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.3em] text-xs md:text-sm mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
-          <h1 className="text-white font-serif text-4xl md:text-8xl mb-6 leading-tight drop-shadow-2xl">
+          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.3em] text-[10px] md:text-sm mb-2 md:mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
+          <h1 className="text-white font-serif text-[48px] md:text-8xl mb-3 md:mb-6 leading-tight drop-shadow-2xl">
             A Scent Full Of <br /><span className="italic text-[#d8e9ff]">Elegance</span>
           </h1>
           <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-10 leading-relaxed font-light">
             Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.
           </p>
           <Link href="/products">
-            <button className="group flex items-center gap-4 bg-[var(--color-brand-primary)] text-white px-10 md:px-16 py-4 md:py-5 text-sm tracking-[0.2em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
-              EXPLORE COLLECTION <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
-            </button>
+              <button className="group flex items-center gap-4 bg-[var(--color-brand-primary)] text-white px-8 md:px-16 py-3 md:py-5 text-xs md:text-sm tracking-[0.2em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
+                EXPLORE COLLECTION <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+              </button>
           </Link>
         </div>
       </section>
@@ -340,71 +313,64 @@ export default function Home() {
       {/* Category Nav Row - Jewelry Style */}
       <section className="py-12 md:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="text-center mb-10 md:mb-14">
+          <div className="hidden md:block text-center mb-10 md:mb-14">
             <h2 className="text-2xl md:text-3xl font-serif text-gray-800 mb-2">Shop By Category</h2>
             <p className="text-[10px] md:text-xs font-bold tracking-[0.3em] text-gray-400 uppercase">Premium Selection</p>
           </div>
 
-          <div className="md:hidden -mx-4 px-4 overflow-hidden">
-            <div
-              className="flex transition-transform duration-300 ease-out"
-              style={{ transform: `translateX(-${mobileCategorySlideIndex * 100}%)` }}
-              onTouchStart={handleMobileTouchStart}
-              onTouchMove={handleMobileTouchMove}
-              onTouchEnd={handleMobileTouchEnd}
-            >
-              {mobileCategorySlides.map((slideColumns, slideIndex) => (
-                <div key={`mobile-category-slide-${slideIndex}`} className="min-w-full px-0 pb-2">
-                  <div className="grid grid-cols-3 gap-3">
-                    {slideColumns.map((column, columnIndex) => (
-                      <div key={`mobile-slide-${slideIndex}-col-${columnIndex}`} className="space-y-3">
-                        {column.map((cat, rowIndex) =>
-                          cat ? (
-                            <Link
-                              href={cat.slug ? `/products?category=${cat.slug}` : '/products'}
-                              key={`mobile-slide-${slideIndex}-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
-                              className="flex flex-col items-center group"
-                            >
-                              <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
-                                <div className="w-9 h-9 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
-                                  <Image
-                                    src={cat.icon}
-                                    alt={cat.name}
-                                    fill
-                                    className="object-contain p-2"
-                                    unoptimized
-                                  />
-                                </div>
-                              </div>
-                              <span className="text-[10px] font-medium text-gray-500 text-center leading-tight group-hover:text-black transition-colors px-1 line-clamp-2 min-h-[28px]">
-                                {cat.name}
-                              </span>
-                            </Link>
-                          ) : (
-                            <div key={`mobile-slide-empty-${slideIndex}-${columnIndex}-${rowIndex}`} className="invisible h-[170px]" aria-hidden="true" />
-                          )
-                        )}
-                      </div>
-                    ))}
-                  </div>
+          <div className="md:hidden max-w-xl mx-auto">
+            <form onSubmit={handleMobileSearchSubmit} className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input
+                type="text"
+                value={mobileSearchKeyword}
+                onChange={(event) => setMobileSearchKeyword(event.target.value)}
+                placeholder="Search by Category"
+                className="w-full rounded-xl border border-gray-200 pl-11 pr-4 py-3 text-base focus:outline-none focus:border-[var(--color-brand-primary)]"
+              />
+            </form>
+          </div>
+
+          <div
+            ref={mobileCategorySliderRef}
+            className="md:hidden -mx-4 px-4 mt-6 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-smooth cursor-grab active:cursor-grabbing"
+            onMouseDown={handleCategoryRailMouseDown}
+            onMouseMove={handleCategoryRailMouseMove}
+            onMouseUp={handleCategoryRailMouseUp}
+            onMouseLeave={handleCategoryRailMouseUp}
+          >
+            <div className="flex gap-3 w-max pr-4">
+              {categoryColumns.map((column, columnIndex) => (
+                <div key={`mobile-column-${columnIndex}`} className="snap-start space-y-3 w-[140px]">
+                  {column.map((cat, rowIndex) =>
+                    cat ? (
+                      <Link
+                        href={cat.slug ? `/products?category=${cat.slug}` : '/products'}
+                        key={`mobile-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
+                        className="flex flex-col items-center group"
+                      >
+                        <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                          <div className="w-9 h-9 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                            <Image
+                              src={cat.icon}
+                              alt={cat.name}
+                              fill
+                              className="object-contain p-2"
+                              unoptimized
+                            />
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-medium text-gray-500 text-center leading-tight group-hover:text-black transition-colors px-1 line-clamp-2 min-h-[28px]">
+                          {cat.name}
+                        </span>
+                      </Link>
+                    ) : (
+                      <div key={`mobile-col-empty-${columnIndex}-${rowIndex}`} className="invisible h-[170px]" aria-hidden="true" />
+                    )
+                  )}
                 </div>
               ))}
             </div>
-            {mobileCategorySlides.length > 1 ? (
-              <div className="flex justify-center gap-2 mt-3">
-                {mobileCategorySlides.map((_, index) => (
-                  <button
-                    key={`mobile-slide-dot-${index}`}
-                    type="button"
-                    aria-label={`Go to category slide ${index + 1}`}
-                    onClick={() => setMobileCategorySlideIndex(index)}
-                    className={`h-1.5 rounded-full transition-all ${
-                      index === mobileCategorySlideIndex ? 'w-8 bg-gray-500' : 'w-4 bg-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-            ) : null}
           </div>
 
           <div
@@ -415,37 +381,35 @@ export default function Home() {
             onMouseUp={handleCategoryRailMouseUp}
             onMouseLeave={handleCategoryRailMouseUp}
           >
-            <div className="flex gap-8">
-              {desktopCategorySlides.map((slide, slideIndex) => (
-                <div key={`desktop-category-slide-${slideIndex}`} className="min-w-full snap-start">
-                  <div className="grid grid-cols-5 gap-x-6 gap-y-12">
-                    {slide.map((cat, index) =>
-                      cat ? (
-                        <Link
-                          href={cat.slug ? `/products?category=${cat.slug}` : '/products'}
-                          key={`${slideIndex}-${cat.slug || 'all'}-${index}`}
-                          className="flex flex-col items-center group"
-                        >
-                          <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
-                            <div className="w-10 h-10 md:w-16 md:h-16 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
-                              <Image
-                                src={cat.icon}
-                                alt={cat.name}
-                                fill
-                                className="object-contain p-2"
-                                unoptimized
-                              />
-                            </div>
+            <div className="flex gap-6 w-max pr-8">
+              {categoryColumns.map((column, columnIndex) => (
+                <div key={`desktop-column-${columnIndex}`} className="snap-start space-y-10 w-[220px]">
+                  {column.map((cat, rowIndex) =>
+                    cat ? (
+                      <Link
+                        href={cat.slug ? `/products?category=${cat.slug}` : '/products'}
+                        key={`desktop-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
+                        className="flex flex-col items-center group"
+                      >
+                        <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                          <div className="w-10 h-10 md:w-16 md:h-16 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                            <Image
+                              src={cat.icon}
+                              alt={cat.name}
+                              fill
+                              className="object-contain p-2"
+                              unoptimized
+                            />
                           </div>
-                          <span className="text-[10px] md:text-[12px] font-medium text-gray-400 text-center leading-tight group-hover:text-black transition-colors px-1">
-                            {cat.name}
-                          </span>
-                        </Link>
-                      ) : (
-                        <div key={`desktop-category-empty-${slideIndex}-${index}`} className="invisible" aria-hidden="true" />
-                      )
-                    )}
-                  </div>
+                        </div>
+                        <span className="text-[10px] md:text-[12px] font-medium text-gray-400 text-center leading-tight group-hover:text-black transition-colors px-1">
+                          {cat.name}
+                        </span>
+                      </Link>
+                    ) : (
+                      <div key={`desktop-col-empty-${columnIndex}-${rowIndex}`} className="invisible h-[300px]" aria-hidden="true" />
+                    )
+                  )}
                 </div>
               ))}
             </div>
