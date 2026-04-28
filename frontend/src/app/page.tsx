@@ -55,6 +55,8 @@ const formatCategoryLabel = (value: string) =>
   String(value || 'general')
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
+const normalizeDisplayLabel = (value: string) =>
+  formatCategoryLabel(String(value || '').toLowerCase());
 
 export default function Home() {
   const router = useRouter();
@@ -70,14 +72,15 @@ export default function Home() {
   const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
 
   const categories = useMemo(() => {
-    const map = new Map<string, { name: string; icon: string; slug: string }>();
+    const map = new Map<string, { name: string; icon: string; slug: string; hasCustomImage: boolean }>();
 
     for (const categoryValue of DEFAULT_CATEGORY_VALUES) {
       const meta = categoryMetaMap[categoryValue];
       map.set(categoryValue, {
         slug: categoryValue,
-        name: meta?.name || formatCategoryLabel(categoryValue),
+        name: normalizeDisplayLabel(meta?.name || categoryValue),
         icon: meta?.image || CATEGORY_ICON_MAP[categoryValue] || CATEGORY_ICON_MAP.general,
+        hasCustomImage: Boolean(meta?.image),
       });
     }
 
@@ -89,8 +92,9 @@ export default function Home() {
           const meta = categoryMetaMap[normalized];
           map.set(normalized, {
             slug: categoryValue,
-            name: meta?.name || formatCategoryLabel(categoryValue),
+            name: normalizeDisplayLabel(meta?.name || categoryValue),
             icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+            hasCustomImage: Boolean(meta?.image),
           });
         }
       }
@@ -103,14 +107,15 @@ export default function Home() {
         const meta = categoryMetaMap[normalized];
         map.set(normalized, {
           slug: categoryValue,
-          name: meta?.name || formatCategoryLabel(categoryValue),
+          name: normalizeDisplayLabel(meta?.name || categoryValue),
           icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+          hasCustomImage: Boolean(meta?.image),
         });
       }
     }
 
     return [
-      { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '' },
+      { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '', hasCustomImage: false },
       ...Array.from(map.values()),
     ];
   }, [allProducts, backendCategories, storedCustomCategories, categoryMetaMap]);
@@ -374,16 +379,26 @@ export default function Home() {
                         key={`mobile-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
                         className="flex flex-col items-center group"
                       >
-                        <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
-                          <div className="w-9 h-9 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                        <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                          {cat.hasCustomImage ? (
                             <Image
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-contain p-2"
+                              className="object-cover"
                               unoptimized
                             />
-                          </div>
+                          ) : (
+                            <div className="w-9 h-9 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                              <Image
+                                src={cat.icon}
+                                alt={cat.name}
+                                fill
+                                className="object-contain p-2"
+                                unoptimized
+                              />
+                            </div>
+                          )}
                         </div>
                         <span className="text-[10px] font-medium text-gray-500 text-center leading-tight group-hover:text-black transition-colors px-1 line-clamp-2 min-h-[28px]">
                           {cat.name}
@@ -416,16 +431,26 @@ export default function Home() {
                         key={`desktop-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
                         className="flex flex-col items-center group"
                       >
-                        <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
-                          <div className="w-10 h-10 md:w-16 md:h-16 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                        <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                          {cat.hasCustomImage ? (
                             <Image
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-contain p-2"
+                              className="object-cover"
                               unoptimized
                             />
-                          </div>
+                          ) : (
+                            <div className="w-10 h-10 md:w-16 md:h-16 relative opacity-70 group-hover:opacity-100 transition-opacity duration-500 transform group-hover:scale-110">
+                              <Image
+                                src={cat.icon}
+                                alt={cat.name}
+                                fill
+                                className="object-contain p-2"
+                                unoptimized
+                              />
+                            </div>
+                          )}
                         </div>
                         <span className="text-[10px] md:text-[12px] font-medium text-gray-400 text-center leading-tight group-hover:text-black transition-colors px-1">
                           {cat.name}
