@@ -8,6 +8,7 @@ const {
   getAllOrders,
   updateOrderStatus,
   createCustomOrder,
+  confirmPaymentStatus,
 } = require('../controllers/orderController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { orderValidation } = require('../middlewares/validationMiddleware');
@@ -17,6 +18,7 @@ router.post('/', protect, orderValidation, createOrder);
 
 // Verify the payment signature returned by Razorpay frontend SDK
 router.post('/verify', protect, verifyPayment);
+router.post('/:id/confirm-payment', protect, confirmPaymentStatus);
 
 // Fetch all orders for the logged-in user (order history)
 router.get('/my-orders', protect, getMyOrders);
