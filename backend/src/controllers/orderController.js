@@ -82,6 +82,58 @@ const buildReceiptId = (userId) => {
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
 
+const settlePaidOrder = async ({ payment, order, customerEmail, clearCartUserId }) => {
+  if (!payment || !order) return;
+
+  const wasAlreadyPaid = order.paymentStatus === 'paid';
+
+  if (!wasAlreadyPaid) {
+    order.paymentStatus = 'paid';
+    order.orderStatus = 'processing';
+    order.paymentMethod = payment.paymentMethod || order.paymentMethod || 'razorpay';
+    await order.save();
+
+    try {
+      for (const item of order.items) {
+        if (item.product) {
+          await Product.findByIdAndUpdate(item.product, {
+            $inc: { stock: -item.quantity },
+          });
+        }
+      }
+    } catch (stockError) {
+      console.error('Stock reduction failed:', stockError.message);
+    }
+
+    if (clearCartUserId) {
+      await Cart.findOneAndUpdate({ user: clearCartUserId }, { items: [] });
+    }
+
+    try {
+      const shipmentResult = await createShipment(order);
+      if (shipmentResult?.awbNumber) {
+        order.awbNumber = shipmentResult.awbNumber;
+        order.orderStatus = 'shipped';
+        order.logisticsStatus = 'in_transit';
+        await order.save();
+
+        await schedulePickup(order);
+      }
+    } catch (logisticsError) {
+      console.error('Delhivery AWB generation failed:', logisticsError.message);
+    }
+
+    try {
+      if (customerEmail) {
+        await sendOrderConfirmation(order, customerEmail);
+      }
+      await sendAdminNewOrderAlert(order);
+    } catch (emailError) {
+      console.error('Order email notification failed:', emailError.message);
+    }
+  }
+};
+
 // @desc    Create new Order & corresponding Razorpay Order
 // @route   POST /api/orders
 // @access  Private
@@ -223,39 +275,12 @@ const verifyPayment = async (req, res) => {
       await payment.save();
 
       const order = await Order.findById(payment.order);
-      order.paymentStatus = 'paid';
-      order.orderStatus = 'processing';
-      order.paymentMethod = payment.paymentMethod || order.paymentMethod || 'razorpay';
-      await order.save();
-
-      await Cart.findOneAndUpdate({ user: req.user._id }, { items: [] });
-
-      try {
-        for (const item of order.items) {
-          await Product.findByIdAndUpdate(item.product, {
-            $inc: { stock: -item.quantity },
-          });
-        }
-      } catch (stockError) {
-        console.error('Stock reduction failed:', stockError.message);
-      }
-
-      try {
-        const shipmentResult = await createShipment(order);
-        if (shipmentResult?.awbNumber) {
-          order.awbNumber = shipmentResult.awbNumber;
-          order.orderStatus = 'shipped';
-          order.logisticsStatus = 'in_transit';
-          await order.save();
-
-          await schedulePickup(order);
-        }
-
-        await sendOrderConfirmation(order, req.user.email);
-        await sendAdminNewOrderAlert(order);
-      } catch (logisticsError) {
-        console.error('Delhivery AWB generation failed:', logisticsError.message);
-      }
+      await settlePaidOrder({
+        payment,
+        order,
+        customerEmail: req.user.email,
+        clearCartUserId: req.user._id,
+      });
 
       return res.status(200).json({
         message: 'Payment verified successfully',
@@ -279,6 +304,67 @@ const verifyPayment = async (req, res) => {
   } catch (error) {
     console.error('verifyPayment error:', error.message);
     res.status(error.statusCode || 500).json({ message: 'Error verifying payment' });
+  }
+};
+
+// @desc    Confirm payment status for an order (fallback for missed checkout callbacks)
+// @route   POST /api/orders/:id/confirm-payment
+// @access  Private
+const confirmPaymentStatus = async (req, res) => {
+  try {
+    ensureRazorpayConfigured();
+
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    if (order.user.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to verify this order' });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.json({ paid: true, orderId: order._id, paymentStatus: order.paymentStatus });
+    }
+
+    const payment = await Payment.findOne({ order: order._id });
+    if (!payment) {
+      return res.status(404).json({ message: 'Payment record not found' });
+    }
+
+    if (payment.status === 'captured' && payment.razorpay_payment_id) {
+      await settlePaidOrder({
+        payment,
+        order,
+        customerEmail: req.user.email,
+        clearCartUserId: req.user._id,
+      });
+      return res.json({ paid: true, orderId: order._id, paymentStatus: order.paymentStatus });
+    }
+
+    const paymentsResponse = await razorpayInstance.orders.fetchPayments(payment.razorpay_order_id);
+    const capturedPayment = (paymentsResponse?.items || []).find((item) => item.status === 'captured');
+
+    if (!capturedPayment) {
+      return res.json({ paid: false, orderId: order._id, paymentStatus: order.paymentStatus });
+    }
+
+    payment.razorpay_payment_id = capturedPayment.id;
+    payment.status = 'captured';
+    payment.paymentMethod = capturedPayment.method || payment.paymentMethod || 'razorpay';
+    await payment.save();
+
+    await settlePaidOrder({
+      payment,
+      order,
+      customerEmail: req.user.email,
+      clearCartUserId: req.user._id,
+    });
+
+    return res.json({ paid: true, orderId: order._id, paymentStatus: order.paymentStatus });
+  } catch (error) {
+    console.error('confirmPaymentStatus error:', error.message);
+    return res.status(500).json({ message: 'Unable to confirm payment status' });
   }
 };
 
@@ -488,4 +574,5 @@ module.exports = {
   getAllOrders,
   updateOrderStatus,
   createCustomOrder,
+  confirmPaymentStatus,
 };
