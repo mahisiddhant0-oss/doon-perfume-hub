@@ -57,6 +57,7 @@ export default function AdminOrders() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSavingCustom, setIsSavingCustom] = useState(false);
+  const [retryingAwbOrderId, setRetryingAwbOrderId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
@@ -194,6 +195,29 @@ export default function AdminOrders() {
       alert(`Tracking: ${trackingText}`);
     } catch (trackError: any) {
       alert(trackError.message || 'Unable to track order');
+    }
+  };
+
+  const retryAwb = async (orderId: string) => {
+    try {
+      setRetryingAwbOrderId(orderId);
+      const token = getToken();
+      const res = await fetch(`${API_ROUTES.LOGISTICS}/retry-awb/${orderId}`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || 'Failed to retry AWB generation');
+      }
+      await fetchOrders();
+      alert(`AWB generated: ${payload?.awbNumber || 'N/A'}`);
+    } catch (retryError: any) {
+      alert(retryError.message || 'Unable to retry AWB');
+    } finally {
+      setRetryingAwbOrderId('');
     }
   };
 
@@ -399,6 +423,14 @@ export default function AdminOrders() {
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={() => retryAwb(order._id)}
+                        disabled={retryingAwbOrderId === order._id}
+                        className="px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:opacity-60 transition-all"
+                        title="Retry AWB Generation"
+                      >
+                        {retryingAwbOrderId === order._id ? 'Retrying...' : 'Retry AWB'}
+                      </button>
                       <button
                         onClick={() => trackOrder(order._id)}
                         className="p-2 text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-lg transition-all"

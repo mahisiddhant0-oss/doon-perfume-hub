@@ -1,11 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { trackOrder, syncDeliveredOrders } = require('../controllers/logisticsController');
+const { trackOrder, syncDeliveredOrders, retryAwbGeneration } = require('../controllers/logisticsController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 
 // @route   GET /api/logistics/track/:orderId
 // @access  Public (or Protected)
 router.get('/track/:orderId', trackOrder);
 router.post('/sync-delivered', protect, adminRights, syncDeliveredOrders);
+router.post('/retry-awb/:orderId', protect, adminRights, retryAwbGeneration);
 
 module.exports = router;

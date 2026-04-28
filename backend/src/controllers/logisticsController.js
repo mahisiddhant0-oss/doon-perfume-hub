@@ -178,4 +178,50 @@ const syncDeliveredOrders = async (req, res) => {
 module.exports = {
   trackOrder,
   syncDeliveredOrders,
+  retryAwbGeneration: async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const order = await Order.findById(orderId);
+
+      if (!order) {
+        return res.status(404).json({ message: 'Order not found' });
+      }
+
+      if (order.paymentStatus !== 'paid') {
+        return res.status(400).json({ message: 'AWB can only be generated for paid orders' });
+      }
+
+      const shipmentResult = await createShipment(order);
+      if (!shipmentResult?.awbNumber) {
+        return res.status(500).json({ message: 'Failed to generate AWB' });
+      }
+
+      order.awbNumber = shipmentResult.awbNumber;
+      order.orderStatus = 'shipped';
+      order.logisticsStatus = 'in_transit';
+      await order.save();
+
+      const pickupResult = await schedulePickup(order);
+
+      try {
+        const user = await User.findById(order.user).select('email');
+        if (user?.email) {
+          await sendOrderConfirmation(order, user.email);
+        }
+        await sendAdminNewOrderAlert(order);
+      } catch (emailError) {
+        console.error(`retryAwbGeneration email update failed for ${order._id}:`, emailError.message);
+      }
+
+      return res.json({
+        message: 'AWB generated successfully',
+        awbNumber: order.awbNumber,
+        pickupScheduled: !pickupResult?.error,
+        pickupMessage: pickupResult?.error || pickupResult?.message || 'Pickup requested',
+      });
+    } catch (error) {
+      console.error('retryAwbGeneration error:', error.message);
+      return res.status(500).json({ message: 'Failed to retry AWB generation', error: error.message });
+    }
+  },
 };
