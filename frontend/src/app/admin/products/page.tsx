@@ -27,6 +27,7 @@ type AdminProduct = {
     price: number;
     stock: number;
     weight: number;
+    image?: string;
   }[];
   category: string;
   categories?: string[];
@@ -40,6 +41,7 @@ type VariantForm = {
   price: number;
   stock: number;
   weight: number;
+  image: string;
 };
 
 type ProductForm = {
@@ -61,6 +63,7 @@ const CATEGORY_OPTIONS = [
   { value: 'bottles', label: 'Glass Bottles' },
 ];
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
+const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 
 const emptyForm: ProductForm = {
   name: '',
@@ -88,6 +91,29 @@ export default function AdminProducts() {
   const [customCategoryPool, setCustomCategoryPool] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
+
+  const readStoredCustomCategories = () => {
+    if (typeof window === 'undefined') return [] as string[];
+    try {
+      const raw = window.localStorage.getItem(LOCAL_CUSTOM_CATEGORIES_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed)
+        ? parsed
+            .map((entry) => String(entry || '').trim())
+            .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()))
+        : [];
+    } catch {
+      return [] as string[];
+    }
+  };
+
+  const persistCustomCategories = (values: string[]) => {
+    if (typeof window === 'undefined') return;
+    const sanitized = values
+      .map((entry) => String(entry || '').trim())
+      .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
+    window.localStorage.setItem(LOCAL_CUSTOM_CATEGORIES_KEY, JSON.stringify(sanitized));
+  };
 
   const mergeCategoryValues = (...inputs: Array<string[] | undefined>) => {
     const seen = new Set<string>();
@@ -137,13 +163,21 @@ export default function AdminProducts() {
             .map((entry) => String(entry || '').trim().toLowerCase())
             .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
         : [];
-      setCustomCategoryPool((prev) => mergeCategoryValues(prev, normalized));
+      setCustomCategoryPool((prev) => {
+        const nextPool = mergeCategoryValues(prev, normalized);
+        persistCustomCategories(nextPool);
+        return nextPool;
+      });
     } catch {
       // fallback to product-derived categories
     }
   };
 
   useEffect(() => {
+    const storedCategories = readStoredCustomCategories();
+    if (storedCategories.length > 0) {
+      setCustomCategoryPool((prevPool) => mergeCategoryValues(prevPool, storedCategories));
+    }
     fetchProducts();
     fetchCategories();
   }, []);
@@ -170,7 +204,11 @@ export default function AdminProducts() {
       })
       .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
 
-    setCustomCategoryPool((prevPool) => mergeCategoryValues(prevPool, categoriesFromProducts));
+    setCustomCategoryPool((prevPool) => {
+      const nextPool = mergeCategoryValues(prevPool, categoriesFromProducts);
+      persistCustomCategories(nextPool);
+      return nextPool;
+    });
   }, [products]);
 
   const handleOpenModal = (product: AdminProduct | null = null) => {
@@ -195,6 +233,7 @@ export default function AdminProducts() {
               price: Number(variant.price || 0),
               stock: Number(variant.stock || 0),
               weight: Number(variant.weight || 0),
+              image: String(variant.image || ''),
             }))
           : [],
         category: sanitizedCategories[0] || 'perfumes',
@@ -225,7 +264,11 @@ export default function AdminProducts() {
         customCategoryInput ? [customCategoryInput] : []
       );
       const finalCategories = normalizedCategoriesForSave.length > 0 ? normalizedCategoriesForSave : ['general'];
-      setCustomCategoryPool((prevPool) => mergeCategoryValues(prevPool, finalCategories));
+      setCustomCategoryPool((prevPool) => {
+        const nextPool = mergeCategoryValues(prevPool, finalCategories);
+        persistCustomCategories(nextPool);
+        return nextPool;
+      });
 
       const userStr = localStorage.getItem('user');
       const token = userStr ? JSON.parse(userStr).token : '';
@@ -244,8 +287,8 @@ export default function AdminProducts() {
         })
       });
 
-      if (res.ok) {
-        const savedProduct = await res.json().catch(() => null);
+        if (res.ok) {
+          const savedProduct = await res.json().catch(() => null);
         const categoriesFromSavedProduct = mergeCategoryValues(
           Array.isArray(savedProduct?.categories) ? savedProduct.categories : [],
           savedProduct?.category ? [savedProduct.category] : [],
@@ -253,6 +296,7 @@ export default function AdminProducts() {
         );
         const nextPool = mergeCategoryValues(customCategoryPool, categoriesFromSavedProduct);
         setCustomCategoryPool(nextPool);
+        persistCustomCategories(nextPool);
 
         // Keep UI in sync instantly for both Create and Edit flows.
         if (savedProduct?._id) {
@@ -318,7 +362,7 @@ export default function AdminProducts() {
   const addVariant = () => {
     setFormData((prev) => ({
       ...prev,
-      variants: [...prev.variants, { label: '', price: 0, stock: 0, weight: 0 }],
+      variants: [...prev.variants, { label: '', price: 0, stock: 0, weight: 0, image: '' }],
     }));
   };
 
@@ -415,6 +459,7 @@ export default function AdminProducts() {
 
     const nextPool = mergeCategoryValues(customCategoryPool, [normalizedCategory]);
     setCustomCategoryPool(nextPool);
+    persistCustomCategories(nextPool);
 
     setFormData((prev) => {
       const nextCategories = mergeCategoryValues(prev.categories, [normalizedCategory]);
@@ -603,8 +648,8 @@ export default function AdminProducts() {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] w-full max-w-5xl rounded-2xl overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-300">
+        <div className="fixed inset-0 z-[100] flex items-start justify-center p-3 md:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] w-full max-w-5xl rounded-2xl shadow-2xl animate-in fade-in zoom-in duration-300 my-2 md:my-6 max-h-[95dvh] overflow-y-auto">
             <div className="p-6 border-b border-[#1a1a1a] flex justify-between items-center">
               <h2 className="text-xl font-serif text-[#D4AF37]">{editingProduct ? 'Edit Fragrance' : 'Add New Fragrance'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-[#888] hover:text-white transition-colors"><XCircle size={24} /></button>
@@ -754,9 +799,26 @@ export default function AdminProducts() {
                 />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Image URL</label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/product-image.jpg"
+                  value={formData.images[0] || ''}
+                  onChange={(e) => {
+                    const value = e.target.value.trim();
+                    setFormData({
+                      ...formData,
+                      images: value ? [value] : [],
+                    });
+                  }}
+                  className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                />
+              </div>
+
               <div className="space-y-3 border border-[#1a1a1a] rounded-xl p-4 bg-black/30">
                 <div className="flex items-center justify-between">
-                  <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Variants (Size/Price/Stock/Weight)</label>
+                  <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Variants (Size/Price/Stock/Weight/Image)</label>
                   <button
                     type="button"
                     onClick={addVariant}
@@ -777,7 +839,7 @@ export default function AdminProducts() {
                           placeholder="Size Label (e.g. 10ml)"
                           value={variant.label}
                           onChange={(e) => updateVariant(index, 'label', e.target.value)}
-                          className="col-span-4 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                          className="col-span-3 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
                         />
                         <input
                           type="number"
@@ -803,7 +865,14 @@ export default function AdminProducts() {
                           placeholder="Weight Kg"
                           value={variant.weight}
                           onChange={(e) => updateVariant(index, 'weight', Number(e.target.value))}
-                          className="col-span-3 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                          className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Image URL"
+                          value={variant.image}
+                          onChange={(e) => updateVariant(index, 'image', e.target.value)}
+                          className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
                         />
                         <button
                           type="button"
