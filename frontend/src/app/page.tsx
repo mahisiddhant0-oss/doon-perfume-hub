@@ -379,13 +379,13 @@ export default function Home() {
                         key={`mobile-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
                         className="flex flex-col items-center group"
                       >
-                        <div className="w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                        <div className="relative w-full aspect-square rounded-2xl bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-2 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
                           {cat.hasCustomImage ? (
                             <Image
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-cover"
+                              className="object-contain p-3"
                               unoptimized
                             />
                           ) : (
@@ -431,13 +431,13 @@ export default function Home() {
                         key={`desktop-col-${columnIndex}-${cat.slug || 'all'}-${rowIndex}`}
                         className="flex flex-col items-center group"
                       >
-                        <div className="w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
+                        <div className="relative w-full aspect-square rounded-2xl md:rounded-[40px] bg-[var(--color-brand-soft)] overflow-hidden flex items-center justify-center mb-4 transition-all duration-500 group-hover:bg-[#dcecff] group-hover:shadow-md group-hover:-translate-y-1">
                           {cat.hasCustomImage ? (
                             <Image
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-cover"
+                              className="object-contain p-4"
                               unoptimized
                             />
                           ) : (
