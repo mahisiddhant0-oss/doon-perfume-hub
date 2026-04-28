@@ -284,7 +284,7 @@ export default function Home() {
       </header>
 
       {/* Hero Banner */}
-      <section className="relative w-full h-[24vh] min-h-[280px] md:h-[90vh] bg-black flex items-center overflow-hidden">
+      <section className="relative w-full h-[16vh] min-h-[170px] md:h-[90vh] bg-black flex items-center overflow-hidden">
         <Image
           src="https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=2000&q=80"
           alt="Hero Banner"
@@ -294,16 +294,16 @@ export default function Home() {
           unoptimized
         />
         <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
-        <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-6 md:px-24 z-10 max-w-7xl mx-auto">
-          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.3em] text-[10px] md:text-sm mb-2 md:mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
-          <h1 className="text-white font-serif text-[48px] md:text-8xl mb-3 md:mb-6 leading-tight drop-shadow-2xl">
+        <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-4 md:px-24 z-10 max-w-7xl mx-auto">
+          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-1 md:mb-4 animate-fade-in">PREMIUM FRAGRANCES</p>
+          <h1 className="text-white font-serif text-[30px] md:text-8xl mb-2 md:mb-6 leading-tight drop-shadow-2xl">
             A Scent Full Of <br /><span className="italic text-[#d8e9ff]">Elegance</span>
           </h1>
           <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-10 leading-relaxed font-light">
             Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.
           </p>
           <Link href="/products">
-              <button className="group flex items-center gap-4 bg-[var(--color-brand-primary)] text-white px-8 md:px-16 py-3 md:py-5 text-xs md:text-sm tracking-[0.2em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
+              <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-5 md:px-16 py-2 md:py-5 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
                 EXPLORE COLLECTION <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
               </button>
           </Link>
