@@ -5,15 +5,17 @@
  */
 
 const normalizeBaseUrl = (value?: string) => value?.replace(/\/+$/, '') || '';
+const PRODUCTION_API_FALLBACK = 'https://api.doonperfumehub.com';
 
 export const API_BASE =
   normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL) ||
-  (process.env.NODE_ENV === 'development' ? '' : '');
+  (process.env.NODE_ENV === 'development' ? '' : PRODUCTION_API_FALLBACK);
 
 export const API_ROUTES = {
   AUTH: `${API_BASE}/api/auth`,
   PRODUCTS: `${API_BASE}/api/products`,
   PRODUCT_CATEGORIES: `${API_BASE}/api/products/categories`,
+  PRODUCT_CATEGORY_BY_ID: (id: string) => `${API_BASE}/api/products/categories/${id}`,
   CART: `${API_BASE}/api/cart`,
   ORDERS: `${API_BASE}/api/orders`,
   LOGISTICS: `${API_BASE}/api/logistics`,

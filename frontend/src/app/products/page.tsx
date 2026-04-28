@@ -35,6 +35,7 @@ interface CartItem {
   size?: string;
   category?: string;
 }
+type CategoryPayload = string | { value?: string };
 
 const DEFAULT_CATEGORY_OPTIONS = [
   { label: 'Perfumes', value: 'perfumes' },
@@ -51,6 +52,14 @@ const normalizeSearchKeyword = (value = '') => value.trim().slice(0, MAX_SEARCH_
 
 // Placeholder image if product has no image or Wix CDN URL
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=400&q=80';
+
+const normalizeCategoryValuesFromPayload = (payload: unknown): string[] => {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((entry) => (typeof entry === 'string' ? entry : String((entry as CategoryPayload)?.value || '')))
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
+};
 
 function getProductImage(product: Product): string {
   if (product.images && product.images.length > 0) {
@@ -183,11 +192,7 @@ function ProductsPageContent() {
         });
         if (!res.ok) return;
         const payload = await res.json();
-        const normalized = Array.isArray(payload)
-          ? payload
-              .map((entry) => String(entry || '').trim().toLowerCase())
-              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
-          : [];
+        const normalized = normalizeCategoryValuesFromPayload(payload);
         setBackendCategories(Array.from(new Set(normalized)));
       } catch {
         // Use product-derived category fallback.

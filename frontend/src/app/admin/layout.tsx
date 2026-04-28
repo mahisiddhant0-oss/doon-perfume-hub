@@ -9,6 +9,7 @@ import {
   Package, 
   ShoppingBag, 
   Users, 
+  Grid3X3,
   LogOut, 
   Menu, 
   X,
@@ -131,7 +132,12 @@ export default function AdminLayout({
     { name: 'Products', href: '/admin/products', icon: Package },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
     { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Manage Categories', href: '/admin/categories', icon: Grid3X3 },
   ];
+
+  const activeNavItem =
+    navItems.find((item) => pathname === item.href) ||
+    navItems.find((item) => pathname?.startsWith(`${item.href}/`));
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex font-sans">
@@ -184,7 +190,7 @@ export default function AdminLayout({
       {/* Main Content */}
       <main className="flex-grow overflow-y-auto">
         <header className="h-20 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-[#1a1a1a] px-8 flex items-center justify-between sticky top-0 z-40">
-          <h1 className="text-xl font-serif text-[#D4AF37] uppercase tracking-widest">{navItems.find(i => i.href === pathname)?.name || 'Dashboard'}</h1>
+          <h1 className="text-xl font-serif text-[#D4AF37] uppercase tracking-widest">{activeNavItem?.name || 'Dashboard'}</h1>
           <div className="flex items-center space-x-4">
              <div className="text-right">
                 <p className="text-sm font-medium">Administrator</p>

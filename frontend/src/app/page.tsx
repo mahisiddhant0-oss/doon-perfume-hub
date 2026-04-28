@@ -16,6 +16,13 @@ interface Product {
   category: string;
   categories?: string[];
 }
+type CategoryMeta = {
+  _id?: string;
+  value: string;
+  name?: string;
+  description?: string;
+  image?: string;
+};
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
@@ -54,6 +61,7 @@ export default function Home() {
   const [viralLaunches, setViralLaunches] = useState<Product[]>([]);
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [backendCategories, setBackendCategories] = useState<string[]>([]);
+  const [categoryMetaMap, setCategoryMetaMap] = useState<Record<string, CategoryMeta>>({});
   const [storedCustomCategories, setStoredCustomCategories] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -65,10 +73,11 @@ export default function Home() {
     const map = new Map<string, { name: string; icon: string; slug: string }>();
 
     for (const categoryValue of DEFAULT_CATEGORY_VALUES) {
+      const meta = categoryMetaMap[categoryValue];
       map.set(categoryValue, {
         slug: categoryValue,
-        name: formatCategoryLabel(categoryValue),
-        icon: CATEGORY_ICON_MAP[categoryValue] || CATEGORY_ICON_MAP.general,
+        name: meta?.name || formatCategoryLabel(categoryValue),
+        icon: meta?.image || CATEGORY_ICON_MAP[categoryValue] || CATEGORY_ICON_MAP.general,
       });
     }
 
@@ -77,10 +86,11 @@ export default function Home() {
         const normalized = categoryValue.toLowerCase();
         if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
         if (!map.has(normalized)) {
+          const meta = categoryMetaMap[normalized];
           map.set(normalized, {
             slug: categoryValue,
-            name: formatCategoryLabel(categoryValue),
-            icon: CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+            name: meta?.name || formatCategoryLabel(categoryValue),
+            icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
           });
         }
       }
@@ -90,10 +100,11 @@ export default function Home() {
       const normalized = String(categoryValue || '').trim().toLowerCase();
       if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
       if (!map.has(normalized)) {
+        const meta = categoryMetaMap[normalized];
         map.set(normalized, {
           slug: categoryValue,
-          name: formatCategoryLabel(categoryValue),
-          icon: CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+          name: meta?.name || formatCategoryLabel(categoryValue),
+          icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
         });
       }
     }
@@ -102,7 +113,7 @@ export default function Home() {
       { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '' },
       ...Array.from(map.values()),
     ];
-  }, [allProducts, backendCategories, storedCustomCategories]);
+  }, [allProducts, backendCategories, storedCustomCategories, categoryMetaMap]);
 
   const categoryColumns = useMemo(() => {
     const columns: Array<Array<(typeof categories)[number] | null>> = [];
@@ -198,12 +209,26 @@ export default function Home() {
         });
         if (!res.ok) return;
         const payload = await res.json();
-        const normalized = Array.isArray(payload)
-          ? payload
-              .map((entry) => String(entry || '').trim().toLowerCase())
-              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
-          : [];
+        const entries = Array.isArray(payload) ? payload : [];
+        const normalized = entries
+          .map((entry) => (typeof entry === 'string' ? entry : String(entry?.value || '')))
+          .map((entry) => String(entry || '').trim().toLowerCase())
+          .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
         setBackendCategories(Array.from(new Set(normalized)));
+        const metaMap: Record<string, CategoryMeta> = {};
+        entries.forEach((entry) => {
+          if (!entry || typeof entry === 'string') return;
+          const value = String(entry.value || '').trim().toLowerCase();
+          if (!value || EXCLUDED_CATEGORY_VALUES.has(value)) return;
+          metaMap[value] = {
+            _id: entry._id,
+            value,
+            name: entry.name || formatCategoryLabel(value),
+            description: entry.description || '',
+            image: entry.image || '',
+          };
+        });
+        setCategoryMetaMap(metaMap);
       } catch {
         // Fallback to product-derived categories only.
       }

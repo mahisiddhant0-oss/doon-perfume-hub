@@ -15,6 +15,11 @@ const normalizeWeightKg = (value) => {
 const normalizeSku = (value = '') => String(value || '').trim();
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
+const formatCategoryName = (value = '') =>
+  String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
 const normalizeCategories = (category, categories) => {
   const fromArray = Array.isArray(categories)
@@ -46,7 +51,7 @@ const upsertCategories = async (categories = []) => {
     normalized.map((value) => ({
       updateOne: {
         filter: { value: String(value).toLowerCase() },
-        update: { $setOnInsert: { value: String(value).toLowerCase() } },
+        update: { $setOnInsert: { value: String(value).toLowerCase(), name: formatCategoryName(value) } },
         upsert: true,
       },
     })),
@@ -56,13 +61,13 @@ const upsertCategories = async (categories = []) => {
 
 const getProductCategories = async (req, res) => {
   try {
-    await upsertCategories(DEFAULT_CATEGORY_VALUES);
-
-    const categoryDocs = await ProductCategory.find({}, { value: 1, _id: 0 }).lean();
     const fromProductsCategories = await Product.distinct('categories');
     const fromProductsPrimary = await Product.distinct('category');
+    await upsertCategories([...DEFAULT_CATEGORY_VALUES, ...fromProductsCategories, ...fromProductsPrimary]);
 
-    const merged = [
+    const categoryDocs = await ProductCategory.find({}, { value: 1, name: 1, description: 1, image: 1 }).lean();
+
+    const mergedValues = [
       ...DEFAULT_CATEGORY_VALUES,
       ...categoryDocs.map((doc) => doc.value),
       ...fromProductsCategories,
@@ -72,8 +77,21 @@ const getProductCategories = async (req, res) => {
       .filter(Boolean)
       .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry));
 
-    const unique = Array.from(new Set(merged));
-    res.json(unique);
+    const unique = Array.from(new Set(mergedValues));
+    const docsByValue = new Map(
+      categoryDocs.map((doc) => [String(doc.value || '').toLowerCase(), doc])
+    );
+    const payload = unique.map((value) => {
+      const existing = docsByValue.get(value);
+      return {
+        _id: existing?._id || value,
+        value,
+        name: existing?.name || formatCategoryName(value),
+        description: existing?.description || '',
+        image: existing?.image || '',
+      };
+    });
+    res.json(payload);
   } catch (error) {
     res.status(500).json({ message: 'Server Error fetching categories', error: error.message });
   }
@@ -82,6 +100,9 @@ const getProductCategories = async (req, res) => {
 const createProductCategory = async (req, res) => {
   try {
     const rawValue = String(req.body?.value || '').trim().toLowerCase();
+    const rawName = String(req.body?.name || '').trim();
+    const rawDescription = String(req.body?.description || '').trim();
+    const rawImage = String(req.body?.image || '').trim();
     if (!rawValue) {
       return res.status(400).json({ message: 'Category value is required' });
     }
@@ -94,16 +115,59 @@ const createProductCategory = async (req, res) => {
 
     const doc = await ProductCategory.findOneAndUpdate(
       { value: rawValue },
-      { $setOnInsert: { value: rawValue } },
+      {
+        $setOnInsert: {
+          value: rawValue,
+          name: rawName || formatCategoryName(rawValue),
+          description: rawDescription,
+          image: rawImage,
+        },
+      },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     );
 
-    return res.status(201).json({ value: doc.value });
+    return res.status(201).json(doc);
   } catch (error) {
     if (error?.code === 11000) {
-      return res.status(200).json({ value: String(req.body?.value || '').trim().toLowerCase() });
+      const value = String(req.body?.value || '').trim().toLowerCase();
+      const existing = await ProductCategory.findOne({ value });
+      return res.status(200).json(existing || { value });
     }
     res.status(500).json({ message: 'Server Error creating category', error: error.message });
+  }
+};
+
+const getProductCategoryById = async (req, res) => {
+  try {
+    const category = await ProductCategory.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    return res.json(category);
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error fetching category', error: error.message });
+  }
+};
+
+const updateProductCategory = async (req, res) => {
+  try {
+    const category = await ProductCategory.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    const nextName = String(req.body?.name || '').trim();
+    const nextDescription = String(req.body?.description || '').trim();
+    const nextImage = String(req.body?.image || '').trim();
+
+    category.name = nextName || category.name || formatCategoryName(category.value);
+    category.description = nextDescription;
+    category.image = nextImage;
+
+    const updated = await category.save();
+    return res.json(updated);
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error updating category', error: error.message });
   }
 };
 
@@ -352,6 +416,8 @@ const deleteProduct = async (req, res) => {
 module.exports = {
   getProductCategories,
   createProductCategory,
+  getProductCategoryById,
+  updateProductCategory,
   getProducts,
   getProductById,
   createProduct,

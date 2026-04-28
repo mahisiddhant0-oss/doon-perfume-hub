@@ -56,6 +56,7 @@ type ProductForm = {
   description: string;
   images: string[];
 };
+type CategoryPayload = string | { value?: string };
 
 const CATEGORY_OPTIONS = [
   { value: 'perfumes', label: 'Perfumes' },
@@ -76,6 +77,14 @@ const emptyForm: ProductForm = {
   categories: ['perfumes'],
   description: '',
   images: []
+};
+
+const normalizeCategoryValuesFromPayload = (payload: unknown): string[] => {
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map((entry) => (typeof entry === 'string' ? entry : String((entry as CategoryPayload)?.value || '')))
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
 };
 
 export default function AdminProducts() {
@@ -158,11 +167,7 @@ export default function AdminProducts() {
       });
       if (!res.ok) return;
       const payload = await res.json();
-      const normalized = Array.isArray(payload)
-        ? payload
-            .map((entry) => String(entry || '').trim().toLowerCase())
-            .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
-        : [];
+      const normalized = normalizeCategoryValuesFromPayload(payload);
       setCustomCategoryPool((prev) => {
         const nextPool = mergeCategoryValues(prev, normalized);
         persistCustomCategories(nextPool);
