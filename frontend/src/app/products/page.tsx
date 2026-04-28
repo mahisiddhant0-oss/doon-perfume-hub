@@ -56,7 +56,13 @@ const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683
 const normalizeCategoryValuesFromPayload = (payload: unknown): string[] => {
   if (!Array.isArray(payload)) return [];
   return payload
-    .map((entry) => (typeof entry === 'string' ? entry : String((entry as CategoryPayload)?.value || '')))
+    .map((entry) =>
+      typeof entry === 'string'
+        ? entry
+        : typeof entry === 'object' && entry && 'value' in entry
+          ? String((entry as { value?: string }).value || '')
+          : ''
+    )
     .map((entry) => String(entry || '').trim().toLowerCase())
     .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
 };
