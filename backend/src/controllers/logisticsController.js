@@ -221,7 +221,7 @@ module.exports = {
       });
     } catch (error) {
       console.error('retryAwbGeneration error:', error.message);
-      return res.status(500).json({ message: 'Failed to retry AWB generation', error: error.message });
+      return res.status(500).json({ message: error.message || 'Failed to retry AWB generation' });
     }
   },
 };
