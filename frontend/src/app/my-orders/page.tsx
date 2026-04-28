@@ -113,7 +113,7 @@ export default function MyOrdersPage() {
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest">Order ID</p>
-                  <p className="text-sm font-medium text-gray-900">{order.orderCode || order._id}</p>
+                  <p className="text-sm font-medium text-gray-900 break-all leading-snug max-w-[220px] sm:max-w-none">{order.orderCode || order._id}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-widest">Date</p>

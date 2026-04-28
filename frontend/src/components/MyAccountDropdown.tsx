@@ -33,12 +33,14 @@ type MyAccountDropdownProps = {
 
 export default function MyAccountDropdown({ compact = false }: MyAccountDropdownProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const autoVerifyLockRef = useRef(false);
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [otpSentLabel, setOtpSentLabel] = useState(false);
   const [devOtp, setDevOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -78,6 +80,9 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
 
       const data = await res.json();
       setOtpSent(true);
+      setOtpSentLabel(true);
+      setOtp('');
+      autoVerifyLockRef.current = false;
       setMessage(`OTP sent to ${data.email}`);
       if (typeof data.devOtp === 'string') {
         setDevOtp(data.devOtp);
@@ -90,6 +95,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
   };
 
   const verifyOtp = async () => {
+    if (otp.length !== 6) return;
     setLoading(true);
     setError('');
     setMessage('');
@@ -112,9 +118,12 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
       setMessage('Login successful');
       setOtp('');
       setOtpSent(false);
+      setOtpSentLabel(false);
       setDevOtp('');
+      autoVerifyLockRef.current = false;
     } catch (verifyError: any) {
       setError(verifyError.message || 'Failed to verify OTP');
+      autoVerifyLockRef.current = false;
     } finally {
       setLoading(false);
     }
@@ -125,9 +134,18 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     setUser(null);
     setOtp('');
     setOtpSent(false);
+    setOtpSentLabel(false);
     setMessage('Logged out');
     setError('');
   };
+
+  useEffect(() => {
+    if (!otpSent || otp.length !== 6 || loading || autoVerifyLockRef.current) {
+      return;
+    }
+    autoVerifyLockRef.current = true;
+    verifyOtp();
+  }, [otp, otpSent, loading]);
 
   const authToken = getAuthToken();
 
@@ -152,7 +170,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
             animate="visible"
             exit="exit"
             transition={{ duration: 0.18 }}
-            className="absolute right-0 mt-3 w-[min(320px,calc(100vw-1.5rem))] bg-white border border-[var(--color-brand-border)] shadow-xl p-4 z-[60]"
+            className="absolute right-0 mt-3 w-80 max-w-[calc(100vw-1rem)] bg-white border border-[var(--color-brand-border)] shadow-xl p-4 z-[70] max-sm:fixed max-sm:left-2 max-sm:right-2 max-sm:top-[72px] max-sm:mt-0 max-sm:w-auto"
           >
             {user ? (
               <>
@@ -184,14 +202,20 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(normalizePhoneInput(e.target.value))}
+                  onChange={(e) => {
+                    setPhone(normalizePhoneInput(e.target.value));
+                    setOtpSentLabel(false);
+                  }}
                   placeholder="Enter phone number (for delivery)"
                   className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
                 />
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(normalizeEmailInput(e.target.value))}
+                  onChange={(e) => {
+                    setEmail(normalizeEmailInput(e.target.value));
+                    setOtpSentLabel(false);
+                  }}
                   placeholder="Enter email address"
                   className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
                 />
@@ -211,21 +235,23 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
                     Dev OTP: <span className="font-semibold">{devOtp}</span>
                   </p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={sendOtp}
-                    disabled={loading || !email || !phone}
+                    disabled={loading || !email || !phone || otpSent}
                     className="flex-1 bg-black text-white py-2 text-xs tracking-widest font-semibold disabled:opacity-50"
                   >
-                    SEND OTP
+                    {otpSentLabel ? 'OTP SENT!' : 'SEND OTP'}
                   </button>
-                  <button
-                    onClick={verifyOtp}
-                    disabled={loading || !otpSent || otp.length !== 6}
-                    className="flex-1 border border-black text-black py-2 text-xs tracking-widest font-semibold disabled:opacity-50"
-                  >
-                    VERIFY
-                  </button>
+                  {otpSent ? (
+                    <button
+                      onClick={sendOtp}
+                      disabled={loading || !email || !phone}
+                      className="flex-1 border border-black text-black py-2 text-xs tracking-widest font-semibold disabled:opacity-50"
+                    >
+                      RESEND OTP
+                    </button>
+                  ) : null}
                 </div>
               </div>
             )}
