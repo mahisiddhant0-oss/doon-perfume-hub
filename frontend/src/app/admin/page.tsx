@@ -1,42 +1,137 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { 
-  TrendingUp, 
-  DollarSign, 
-  ShoppingBag, 
-  Users, 
-  ArrowUpRight, 
-  ArrowDownRight,
+import React, { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import {
+  TrendingUp,
+  DollarSign,
+  ShoppingBag,
+  Users,
   Clock,
   CheckCircle2,
-  PackageCheck
-} from 'lucide-react';
+  PackageCheck,
+  ArrowUpRight,
+} from "lucide-react";
+import { API_ROUTES } from "@/lib/api";
+
+type AdminOrder = {
+  _id: string;
+  totalAmount: number;
+  orderStatus: string;
+  paymentStatus: string;
+  awbNumber?: string;
+  user?: {
+    name?: string;
+    email?: string;
+  };
+  createdAt: string;
+};
+
+type AdminProduct = {
+  stock?: number;
+  name?: string;
+  sku?: string;
+};
+
+const formatRelativeTime = (dateString: string) => {
+  const now = Date.now();
+  const then = new Date(dateString).getTime();
+  const diffMs = Math.max(0, now - then);
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min${mins === 1 ? "" : "s"} ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs} hr${hrs === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+};
+
+const statusClass = (status: string) => {
+  if (status === "delivered") return "bg-green-500/10 text-green-500 border-green-500/20";
+  if (status === "processing") return "bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20";
+  if (status === "paid" || status === "shipped") return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+  return "bg-gray-500/10 text-gray-400 border-gray-500/20";
+};
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
-    totalRevenue: 245000,
-    totalOrders: 156,
-    totalUsers: 842,
-    conversionRate: 3.2
-  });
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const recentOrders = [
-    { id: '#8492', user: 'Mahish S.', amount: '₹1,240', status: 'processing', date: '2 mins ago' },
-    { id: '#8491', user: 'Ananya R.', amount: '₹850', status: 'shipped', date: '15 mins ago' },
-    { id: '#8490', user: 'Rahul V.', amount: '₹2,100', status: 'paid', date: '1 hr ago' },
-    { id: '#8489', user: 'Priya K.', amount: '₹3,400', status: 'delivered', date: '3 hrs ago' },
-  ];
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const userRaw = localStorage.getItem("user");
+        const token = userRaw ? JSON.parse(userRaw)?.token : "";
+        if (!token) throw new Error("Not authenticated");
 
-  const StatCard = ({ title, value, icon: Icon, change, trend }: any) => (
+        const [ordersRes, productsRes] = await Promise.all([
+          fetch(API_ROUTES.ORDERS, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(API_ROUTES.PRODUCTS, { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
+
+        if (!ordersRes.ok) {
+          const payload = await ordersRes.json().catch(() => null);
+          throw new Error(payload?.message || "Failed to fetch orders");
+        }
+        if (!productsRes.ok) {
+          const payload = await productsRes.json().catch(() => null);
+          throw new Error(payload?.message || "Failed to fetch products");
+        }
+
+        const ordersPayload = await ordersRes.json();
+        const productsPayload = await productsRes.json();
+        setOrders(Array.isArray(ordersPayload) ? ordersPayload : []);
+        setProducts(Array.isArray(productsPayload) ? productsPayload : []);
+      } catch (e: any) {
+        setError(e?.message || "Failed to load dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  const dashboard = useMemo(() => {
+    const paidOrders = orders.filter((o) => o.paymentStatus === "paid");
+    const totalRevenue = paidOrders.reduce((sum, o) => sum + (Number(o.totalAmount) || 0), 0);
+    const uniqueCustomers = new Set(
+      paidOrders.map((o) => o.user?.email || o.user?.name || "").filter(Boolean)
+    ).size;
+    const deliveredCount = paidOrders.filter((o) => o.orderStatus === "delivered").length;
+    const conversionRate = paidOrders.length > 0 ? (deliveredCount / paidOrders.length) * 100 : 0;
+
+    const recentOrders = [...paidOrders]
+      .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+      .slice(0, 8);
+
+    const lowStock = products.filter((p) => Number(p.stock || 0) > 0 && Number(p.stock || 0) <= 5).length;
+    const pendingAwb = paidOrders.filter((o) => !o.awbNumber).length;
+
+    return {
+      totalRevenue,
+      totalOrders: paidOrders.length,
+      totalCustomers: uniqueCustomers,
+      conversionRate,
+      recentOrders,
+      lowStock,
+      pendingAwb,
+    };
+  }, [orders, products]);
+
+  const StatCard = ({ title, value, icon: Icon }: { title: string; value: string; icon: any }) => (
     <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-6 rounded-2xl hover:border-[#D4AF37]/30 transition-all group">
       <div className="flex justify-between items-start mb-4">
         <div className="p-3 bg-[#D4AF37]/5 rounded-xl text-[#D4AF37] group-hover:bg-[#D4AF37]/10 transition-colors">
           <Icon size={24} />
         </div>
-        <div className={`flex items-center text-xs font-medium ${trend === 'up' ? 'text-green-500' : 'text-red-500'} bg-black px-2 py-1 rounded-full border border-current/20`}>
-          {trend === 'up' ? <ArrowUpRight size={14} className="mr-1" /> : <ArrowDownRight size={14} className="mr-1" />}
-          {change}%
+        <div className="flex items-center text-xs font-medium text-green-500 bg-black px-2 py-1 rounded-full border border-current/20">
+          <ArrowUpRight size={14} className="mr-1" />
+          Live
         </div>
       </div>
       <h3 className="text-[#888] text-sm font-medium mb-1">{title}</h3>
@@ -46,20 +141,20 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Revenue" value={`₹${stats.totalRevenue.toLocaleString('en-IN')}`} icon={DollarSign} change="12.5" trend="up" />
-        <StatCard title="Total Orders" value={stats.totalOrders} icon={ShoppingBag} change="8.2" trend="up" />
-        <StatCard title="Total Customers" value={stats.totalUsers} icon={Users} change="5.4" trend="up" />
-        <StatCard title="Conversion Rate" value={`${stats.conversionRate}%`} icon={TrendingUp} change="1.1" trend="down" />
+        <StatCard title="Total Revenue" value={`₹${dashboard.totalRevenue.toLocaleString("en-IN")}`} icon={DollarSign} />
+        <StatCard title="Total Orders" value={`${dashboard.totalOrders}`} icon={ShoppingBag} />
+        <StatCard title="Total Customers" value={`${dashboard.totalCustomers}`} icon={Users} />
+        <StatCard title="Conversion Rate" value={`${dashboard.conversionRate.toFixed(1)}%`} icon={TrendingUp} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Recent Orders */}
         <div className="lg:col-span-2 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">
           <div className="p-6 border-b border-[#1a1a1a] flex justify-between items-center">
             <h2 className="text-lg font-serif font-bold text-[#D4AF37]">Recent Sales Activity</h2>
-            <button className="text-xs text-[#888] hover:text-[#D4AF37] transition-colors">View All Orders</button>
+            <Link href="/admin/orders" className="text-xs text-[#888] hover:text-[#D4AF37] transition-colors">
+              View All Orders
+            </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -73,38 +168,47 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#1a1a1a]">
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-white/[0.02] transition-colors group">
-                    <td className="px-6 py-4 text-sm font-medium text-[#D4AF37]">{order.id}</td>
-                    <td className="px-6 py-4 text-sm text-white">{order.user}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-white">{order.amount}</td>
-                    <td className="px-6 py-4">
-                      <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md border ${
-                        order.status === 'delivered' ? 'bg-green-500/10 text-green-500 border-green-500/20' :
-                        order.status === 'processing' ? 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/20' :
-                        'bg-blue-500/10 text-blue-500 border-blue-500/20'
-                      }`}>
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-[#888] text-right">{order.date}</td>
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-[#888] text-sm">Loading real orders...</td>
                   </tr>
-                ))}
+                ) : error ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-red-400 text-sm">{error}</td>
+                  </tr>
+                ) : dashboard.recentOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-[#888] text-sm">No paid orders yet.</td>
+                  </tr>
+                ) : (
+                  dashboard.recentOrders.map((order) => (
+                    <tr key={order._id} className="hover:bg-white/[0.02] transition-colors group">
+                      <td className="px-6 py-4 text-sm font-medium text-[#D4AF37]">#{order._id.slice(-12).toUpperCase()}</td>
+                      <td className="px-6 py-4 text-sm text-white">{order.user?.name || order.user?.email || "Customer"}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">₹{Number(order.totalAmount || 0).toLocaleString("en-IN")}</td>
+                      <td className="px-6 py-4">
+                        <span className={`text-[10px] uppercase font-bold px-2 py-1 rounded-md border ${statusClass(order.orderStatus)}`}>
+                          {order.orderStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-[#888] text-right">{formatRelativeTime(order.createdAt)}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
         </div>
 
-        {/* Quick Actions / Inventory Health */}
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-6 space-y-6">
           <h2 className="text-lg font-serif font-bold text-[#D4AF37] mb-4">Inventory & Health</h2>
-          
+
           <div className="space-y-4">
             <div className="flex items-center space-x-4 p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
               <Clock className="text-red-500" size={20} />
               <div>
-                <p className="text-sm font-bold text-white">4 Items Low Stock</p>
-                <p className="text-xs text-[#888]">Restock Signature Scent (SKU: Perf-001)</p>
+                <p className="text-sm font-bold text-white">{dashboard.lowStock} Items Low Stock</p>
+                <p className="text-xs text-[#888]">Based on current live inventory.</p>
               </div>
             </div>
 
@@ -112,23 +216,26 @@ export default function AdminDashboard() {
               <CheckCircle2 className="text-green-500" size={20} />
               <div>
                 <p className="text-sm font-bold text-white">Logistics Online</p>
-                <p className="text-xs text-[#888]">Delhivery API connected & healthy.</p>
+                <p className="text-xs text-[#888]">Using live paid-order and AWB data.</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-4 p-4 bg-[#D4AF37]/5 border border-[#D4AF37]/10 rounded-xl">
               <PackageCheck className="text-[#D4AF37]" size={20} />
               <div>
-                <p className="text-sm font-bold text-white">12 Pending Pickups</p>
-                <p className="text-xs text-[#888]">Scheduled for today at 2:00 PM.</p>
+                <p className="text-sm font-bold text-white">{dashboard.pendingAwb} Pending AWBs</p>
+                <p className="text-xs text-[#888]">Paid orders still awaiting AWB generation.</p>
               </div>
             </div>
           </div>
 
           <div className="pt-6 border-t border-[#1a1a1a]">
-            <button className="w-full py-3 bg-[#D4AF37] text-black font-bold rounded-xl hover:bg-[#bda871] transition-colors text-sm uppercase tracking-widest">
+            <Link
+              href="/admin/products"
+              className="block w-full py-3 bg-[#D4AF37] text-black font-bold rounded-xl hover:bg-[#bda871] transition-colors text-sm uppercase tracking-widest text-center"
+            >
               Add New Product
-            </button>
+            </Link>
           </div>
         </div>
       </div>
