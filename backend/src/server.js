@@ -103,71 +103,45 @@ const connectDB = async () => {
 
 connectDB();
 
-const backfillMissingOrderCodes = async () => {
+const reconcileOrderCodes = async () => {
   try {
     if (mongoose.connection?.readyState !== 1) return;
 
-    const existingCodes = await Order.find({ orderCode: /^DPH#\d+$/i }).select('orderCode');
-    let maxExisting = 1000;
-    for (const row of existingCodes) {
-      const numeric = Number(String(row.orderCode || '').replace(/[^0-9]/g, ''));
-      if (!Number.isNaN(numeric) && numeric > maxExisting) {
-        maxExisting = numeric;
+    const orders = await Order.find({}).sort({ createdAt: 1, _id: 1 }).select('_id orderCode');
+    if (orders.length === 0) {
+      await Counter.findOneAndUpdate(
+        { key: 'order' },
+        { $set: { key: 'order', seq: 1000 } },
+        { upsert: true, new: true }
+      );
+      return;
+    }
+
+    let sequence = 1000;
+    let updatedCount = 0;
+    for (const order of orders) {
+      sequence += 1;
+      const expectedCode = `DPH#${sequence}`;
+      if (order.orderCode !== expectedCode) {
+        await Order.updateOne({ _id: order._id }, { $set: { orderCode: expectedCode } });
+        updatedCount += 1;
       }
     }
 
     await Counter.findOneAndUpdate(
       { key: 'order' },
-      { $setOnInsert: { key: 'order', seq: 1000 } },
+      { $set: { key: 'order', seq: sequence } },
       { upsert: true, new: true }
     );
 
-    await Counter.findOneAndUpdate(
-      { key: 'order' },
-      { $max: { seq: maxExisting } },
-      { new: true }
-    );
-
-    const missingCount = await Order.countDocuments({
-      $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }],
-    });
-
-    if (!missingCount) return;
-
-    const orders = await Order.find({
-      $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }],
-    })
-      .sort({ createdAt: 1 })
-      .select('_id');
-
-    for (const order of orders) {
-      await Counter.updateOne(
-        { key: 'order' },
-        { $setOnInsert: { key: 'order', seq: 1000 } },
-        { upsert: true }
-      );
-
-      const counter = await Counter.findOneAndUpdate(
-        { key: 'order' },
-        { $inc: { seq: 1 } },
-        { new: true }
-      );
-
-      const code = `DPH#${counter.seq}`;
-      await Order.updateOne(
-        { _id: order._id, $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }] },
-        { $set: { orderCode: code } }
-      );
-    }
-
-    console.log(`Backfilled order codes for ${orders.length} order(s).`);
+    console.log(`Reconciled order codes. Updated ${updatedCount} of ${orders.length} order(s). Next sequence: ${sequence + 1}`);
   } catch (error) {
-    console.error('Order code backfill failed:', error.message);
+    console.error('Order code reconciliation failed:', error.message);
   }
 };
 
 setTimeout(() => {
-  backfillMissingOrderCodes();
+  reconcileOrderCodes();
 }, 5000);
 
 app.use('/api/auth', authRoutes);

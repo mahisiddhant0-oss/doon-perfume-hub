@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { API_ROUTES } from '@/lib/api';
+import Link from 'next/link';
 import {
   ShoppingBag,
   Search,
@@ -372,7 +373,12 @@ export default function AdminOrders() {
                 <tr key={order._id} className="hover:bg-white/[0.01] transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex flex-col">
-                      <span className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter">{order.orderCode || `#${order._id.toUpperCase()}`}</span>
+                      <Link
+                        href={`/admin/orders/${order._id}`}
+                        className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter underline underline-offset-2 hover:text-white transition-colors w-fit"
+                      >
+                        {order.orderCode || `#${order._id.toUpperCase()}`}
+                      </Link>
                       <span className="text-[#888] text-[10px] flex items-center">
                         <CreditCard size={10} className="mr-1" />
                         {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
