@@ -385,7 +385,7 @@ export default function Home() {
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-contain p-3"
+                              className="object-cover"
                               unoptimized
                             />
                           ) : (
@@ -437,7 +437,7 @@ export default function Home() {
                               src={cat.icon}
                               alt={cat.name}
                               fill
-                              className="object-contain p-4"
+                              className="object-cover"
                               unoptimized
                             />
                           ) : (
