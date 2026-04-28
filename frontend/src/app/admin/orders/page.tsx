@@ -6,7 +6,7 @@ import {
   ShoppingBag,
   Search,
   RefreshCw,
-  MoreVertical,
+  Plane,
   CheckCircle,
   Truck,
   CreditCard,
@@ -186,13 +186,14 @@ export default function AdminOrders() {
       const res = await fetch(`${API_ROUTES.LOGISTICS}/track/${orderId}`);
       const payload = await res.json().catch(() => null);
       if (!res.ok) throw new Error(payload?.message || 'Tracking unavailable');
-      const trackingText =
-        payload?.tracking?.Status?.Status ||
-        payload?.tracking?.status ||
-        payload?.tracking?.details ||
-        payload?.status ||
-        'Tracking fetched';
-      alert(`Tracking: ${trackingText}`);
+      const awbFromPayload = payload?.awbNumber;
+      if (!awbFromPayload) {
+        throw new Error('AWB not available for this order yet');
+      }
+
+      // Open Delhivery tracking page directly with AWB prefilled in URL
+      const trackingUrl = `https://www.delhivery.com/track/package/${encodeURIComponent(awbFromPayload)}`;
+      window.open(trackingUrl, '_blank', 'noopener,noreferrer');
     } catch (trackError: any) {
       alert(trackError.message || 'Unable to track order');
     }
@@ -423,20 +424,23 @@ export default function AdminOrders() {
                   </td>
                   <td className="px-8 py-6 text-right">
                     <div className="flex justify-end space-x-2">
-                      <button
-                        onClick={() => retryAwb(order._id)}
-                        disabled={retryingAwbOrderId === order._id}
-                        className="px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:opacity-60 transition-all"
-                        title="Retry AWB Generation"
-                      >
-                        {retryingAwbOrderId === order._id ? 'Retrying...' : 'Retry AWB'}
-                      </button>
+                      {!order.awbNumber ? (
+                        <button
+                          onClick={() => retryAwb(order._id)}
+                          disabled={retryingAwbOrderId === order._id}
+                          className="px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:opacity-60 transition-all"
+                          title="Generate AWB"
+                        >
+                          {retryingAwbOrderId === order._id ? 'Generating...' : 'Generate AWB'}
+                        </button>
+                      ) : null}
                       <button
                         onClick={() => trackOrder(order._id)}
-                        className="p-2 text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-lg transition-all"
-                        title="Track Shipment"
+                        disabled={!order.awbNumber}
+                        className="p-2 text-[#888] hover:text-[#D4AF37] hover:bg-[#D4AF37]/5 rounded-lg transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Open Delhivery Tracking"
                       >
-                        <MoreVertical size={18} />
+                        <Plane size={18} />
                       </button>
                       <button
                         onClick={() => markAsDelivered(order._id)}
