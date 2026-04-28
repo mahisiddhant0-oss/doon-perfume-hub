@@ -831,7 +831,7 @@ export default function AdminProducts() {
                 {formData.variants.length === 0 ? (
                   <p className="text-[11px] text-[#666]">No variants added. Use base price/stock/weight for single-size product.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
                     {formData.variants.map((variant, index) => (
                       <div key={`variant-${index}`} className="grid grid-cols-12 gap-2 items-center">
                         <input
