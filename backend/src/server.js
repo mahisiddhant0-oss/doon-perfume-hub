@@ -5,7 +5,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const mongoSanitize = require('mongo-sanitize');
 const rateLimit = require('express-rate-limit');
-const { getAllowedOrigins, getPrimaryFrontendUrl, isProduction, validateEnv } = require('./config/env');
+const { getAllowedOrigins, getPrimaryFrontendUrl, isOriginAllowed, isProduction, validateEnv } = require('./config/env');
 const Order = require('./models/Order');
 const Counter = require('./models/Counter');
 
@@ -40,7 +40,7 @@ app.use(
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.length === 0 || isOriginAllowed(origin, allowedOrigins)) {
         return callback(null, true);
       }
 
@@ -118,8 +118,14 @@ const backfillMissingOrderCodes = async () => {
 
     await Counter.findOneAndUpdate(
       { key: 'order' },
-      { $max: { seq: maxExisting }, $setOnInsert: { seq: 1000 } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { $setOnInsert: { key: 'order', seq: 1000 } },
+      { upsert: true, new: true }
+    );
+
+    await Counter.findOneAndUpdate(
+      { key: 'order' },
+      { $max: { seq: maxExisting } },
+      { new: true }
     );
 
     const missingCount = await Order.countDocuments({
@@ -135,10 +141,16 @@ const backfillMissingOrderCodes = async () => {
       .select('_id');
 
     for (const order of orders) {
+      await Counter.updateOne(
+        { key: 'order' },
+        { $setOnInsert: { key: 'order', seq: 1000 } },
+        { upsert: true }
+      );
+
       const counter = await Counter.findOneAndUpdate(
         { key: 'order' },
-        { $inc: { seq: 1 }, $setOnInsert: { seq: 1000 } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { $inc: { seq: 1 } },
+        { new: true }
       );
 
       const code = `DPH#${counter.seq}`;

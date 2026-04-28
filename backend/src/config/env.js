@@ -22,6 +22,21 @@ const getAllowedOrigins = () => splitCsv(process.env.FRONTEND_URL);
 
 const getPrimaryFrontendUrl = () => getAllowedOrigins()[0] || '';
 
+const isOriginAllowed = (origin = '', allowedOrigins = []) => {
+  if (!origin) return true;
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  // Allow Vercel preview deployments (e.g. <branch>-<team>.vercel.app)
+  if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
+    return true;
+  }
+
+  return false;
+};
+
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
 
@@ -64,6 +79,7 @@ const validateEnv = () => {
 
 module.exports = {
   getAllowedOrigins,
+  isOriginAllowed,
   getJwtSecret,
   getPrimaryFrontendUrl,
   isProduction,

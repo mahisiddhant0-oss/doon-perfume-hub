@@ -85,6 +85,18 @@ const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
 const normalizeSku = (value = '') => String(value || '').trim().toUpperCase();
 const getCheckoutItemProductId = (item = {}) =>
   String(item?.id || item?.product || item?._id || item?.productId || '').trim();
+const extractErrorMessage = (error) =>
+  error?.message ||
+  error?.description ||
+  error?.error?.description ||
+  error?.error?.message ||
+  error?.error?.reason ||
+  error?.response?.data?.error?.description ||
+  error?.response?.data?.error?.message ||
+  error?.response?.error?.description ||
+  error?.response?.error?.message ||
+  error?.reason ||
+  'Unknown error';
 
 const settlePaidOrder = async ({ payment, order, customerEmail, clearCartUserId }) => {
   if (!payment || !order) return;
@@ -258,9 +270,10 @@ const createOrder = async (req, res) => {
       totalAmount,
     });
   } catch (error) {
-    console.error('createOrder error:', error.message);
+    const errorMessage = extractErrorMessage(error);
+    console.error('createOrder error:', errorMessage, error);
     if (error?.name === 'ValidationError') {
-      return res.status(400).json({ message: error.message || 'Invalid order details.' });
+      return res.status(400).json({ message: errorMessage || 'Invalid order details.' });
     }
 
     if (error?.code === 11000) {
@@ -269,13 +282,23 @@ const createOrder = async (req, res) => {
 
     const knownUserSafeError =
       /Product not found|unavailable|Invalid quantity|Selected size|No valid items found|cart is empty/i.test(
-        String(error?.message || '')
+        String(errorMessage || '')
       );
     if (knownUserSafeError) {
-      return res.status(400).json({ message: error.message });
+      return res.status(400).json({ message: errorMessage });
     }
 
-    res.status(error.statusCode || 500).json({ message: 'Error creating order' });
+    const isGatewayError =
+      /razorpay|gateway|payment|receipt|amount|currency|authentication|unauthorized|bad request/i.test(
+        String(errorMessage || '')
+      );
+    if (isGatewayError) {
+      return res.status(error?.statusCode || 502).json({ message: `Payment gateway error: ${errorMessage}` });
+    }
+
+    res.status(error.statusCode || 500).json({
+      message: errorMessage && errorMessage !== 'Unknown error' ? `Error creating order: ${errorMessage}` : 'Error creating order',
+    });
   }
 };
 

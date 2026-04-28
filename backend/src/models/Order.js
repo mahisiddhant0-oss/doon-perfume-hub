@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const Counter = require('./Counter');
 
 const orderItemSchema = new mongoose.Schema({
   product: {
@@ -102,13 +101,12 @@ orderSchema.pre('validate', async function () {
     return;
   }
 
-  const counter = await Counter.findOneAndUpdate(
-    { key: 'order' },
-    { $inc: { seq: 1 }, $setOnInsert: { seq: 1000 } },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-
-  this.orderCode = `DPH#${counter.seq}`;
+  // Avoid checkout failures from counter write conflicts by generating
+  // a deterministic-enough code without depending on Counter documents.
+  const suffix = `${Date.now()}${Math.floor(Math.random() * 1000)
+    .toString()
+    .padStart(3, '0')}`;
+  this.orderCode = `DPH#${suffix}`;
 });
 
 module.exports = mongoose.model('Order', orderSchema);
