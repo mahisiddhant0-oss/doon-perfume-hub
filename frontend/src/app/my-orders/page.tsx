@@ -18,6 +18,7 @@ interface Order {
   orderStatus: string;
   paymentStatus: string;
   totalAmount: number;
+  awbNumber?: string;
   subtotal?: number;
   gstAmount?: number;
   items: OrderItem[];
@@ -60,6 +61,25 @@ export default function MyOrdersPage() {
 
     loadOrders();
   }, []);
+
+  const openTracking = (awbNumber?: string) => {
+    if (!awbNumber) return;
+    const trackingUrl = `https://www.delhivery.com/track/package/${encodeURIComponent(awbNumber)}`;
+    window.open(trackingUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  const contactUs = () => {
+    const isPhoneDevice = /Android|iPhone|iPad|iPod|Mobile|Windows Phone|Opera Mini/i.test(
+      navigator.userAgent || ''
+    );
+
+    if (isPhoneDevice) {
+      window.location.href = 'tel:+917500039499';
+      return;
+    }
+
+    window.location.href = 'mailto:doonperfumehub@gmail.com?subject=Order%20Support%20-%20Doon%20Perfume%20Hub';
+  };
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -117,6 +137,24 @@ export default function MyOrdersPage() {
                     </span>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openTracking(order.awbNumber)}
+                  disabled={!order.awbNumber}
+                  className="text-xs tracking-[0.12em] uppercase border border-gray-300 px-3 py-2 hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Track Order
+                </button>
+                <button
+                  type="button"
+                  onClick={contactUs}
+                  className="text-xs tracking-[0.12em] uppercase border border-gray-300 px-3 py-2 hover:border-[var(--color-brand-primary)] hover:text-[var(--color-brand-primary)] transition-colors"
+                >
+                  Contact Us
+                </button>
               </div>
             </div>
           ))}
