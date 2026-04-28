@@ -16,7 +16,7 @@ const roundWeight = (value) => Math.round((value + Number.EPSILON) * 1000) / 100
 
 const calculateBilling = (items = [], productMap = new Map()) => {
   const normalizedItems = items.map((item) => {
-    const productId = String(item.id || item.product || '');
+    const productId = getCheckoutItemProductId(item);
     const product = productMap.get(productId);
 
     if (!product) {
@@ -81,6 +81,8 @@ const buildReceiptId = (userId) => {
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
+const getCheckoutItemProductId = (item = {}) =>
+  String(item?.id || item?.product || item?._id || item?.productId || '').trim();
 
 const settlePaidOrder = async ({ payment, order, customerEmail, clearCartUserId }) => {
   if (!payment || !order) return;
@@ -171,9 +173,9 @@ const createOrder = async (req, res) => {
       }));
     }
 
-    const productIds = [...new Set(checkoutItems.map((item) => String(item.id || item.product || '')))].filter(Boolean);
+    const productIds = [...new Set(checkoutItems.map((item) => getCheckoutItemProductId(item)))].filter(Boolean);
     if (productIds.length === 0) {
-      return res.status(400).json({ message: 'No valid items found for checkout.' });
+      return res.status(400).json({ message: 'No valid items found for checkout. Please re-add products to cart and try again.' });
     }
 
     const products = await Product.find({ _id: { $in: productIds } }).select('name price variants weightKg');
@@ -233,11 +235,23 @@ const createOrder = async (req, res) => {
     });
   } catch (error) {
     console.error('createOrder error:', error.message);
-    const message =
-      process.env.NODE_ENV === 'development'
-        ? error.message || 'Error creating order'
-        : 'Error creating order';
-    res.status(error.statusCode || 500).json({ message });
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({ message: error.message || 'Invalid order details.' });
+    }
+
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: 'Order creation conflict. Please retry checkout.' });
+    }
+
+    const knownUserSafeError =
+      /Product not found|unavailable|Invalid quantity|Selected size|No valid items found|cart is empty/i.test(
+        String(error?.message || '')
+      );
+    if (knownUserSafeError) {
+      return res.status(400).json({ message: error.message });
+    }
+
+    res.status(error.statusCode || 500).json({ message: 'Error creating order' });
   }
 };
 
