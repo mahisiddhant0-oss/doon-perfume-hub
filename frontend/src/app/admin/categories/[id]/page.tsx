@@ -162,6 +162,15 @@ export default function CategoryEditorPage() {
               placeholder="https://example.com/category-icon.png"
               className="w-full bg-black border border-[#1a1a1a] p-3 rounded-lg text-sm focus:border-[#D4AF37] outline-none"
             />
+            <p className="text-[11px] text-[#888]">Use image URL only. File upload/drop is disabled.</p>
+            <div className="w-20 h-20 rounded-lg bg-black border border-[#1a1a1a] overflow-hidden flex items-center justify-center">
+              {form.image ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={form.image} alt={form.name || "Category"} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-[#666] text-[10px]">Preview</span>
+              )}
+            </div>
           </div>
 
           <button
@@ -176,4 +185,3 @@ export default function CategoryEditorPage() {
     </div>
   );
 }
-
