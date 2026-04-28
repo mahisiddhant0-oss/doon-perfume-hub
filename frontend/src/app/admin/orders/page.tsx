@@ -17,6 +17,7 @@ import {
 
 type AdminOrder = {
   _id: string;
+  orderCode?: string;
   user: {
     name: string;
     email: string;
@@ -118,6 +119,7 @@ export default function AdminOrders() {
 
     return orders.filter((order) =>
       order._id.toLowerCase().includes(query) ||
+      (order.orderCode || '').toLowerCase().includes(query) ||
       order.user.name.toLowerCase().includes(query) ||
       order.user.email.toLowerCase().includes(query)
     );
@@ -370,7 +372,7 @@ export default function AdminOrders() {
                 <tr key={order._id} className="hover:bg-white/[0.01] transition-colors group">
                   <td className="px-8 py-6">
                     <div className="flex flex-col">
-                      <span className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter">#{order._id.toUpperCase()}</span>
+                      <span className="text-[#D4AF37] text-xs font-bold mb-1 font-mono tracking-tighter">{order.orderCode || `#${order._id.toUpperCase()}`}</span>
                       <span className="text-[#888] text-[10px] flex items-center">
                         <CreditCard size={10} className="mr-1" />
                         {new Date(order.createdAt).toLocaleDateString()} at {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

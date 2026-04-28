@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const Counter = require('./Counter');
 
 const orderItemSchema = new mongoose.Schema({
   product: {
@@ -17,6 +18,12 @@ const orderItemSchema = new mongoose.Schema({
 });
 
 const orderSchema = new mongoose.Schema({
+  orderCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+    trim: true
+  },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -89,5 +96,19 @@ const orderSchema = new mongoose.Schema({
     type: Date
   }
 }, { timestamps: true });
+
+orderSchema.pre('validate', async function () {
+  if (!this.isNew || this.orderCode) {
+    return;
+  }
+
+  const counter = await Counter.findOneAndUpdate(
+    { key: 'order' },
+    { $inc: { seq: 1 }, $setOnInsert: { seq: 1000 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  this.orderCode = `DPH#${counter.seq}`;
+});
 
 module.exports = mongoose.model('Order', orderSchema);

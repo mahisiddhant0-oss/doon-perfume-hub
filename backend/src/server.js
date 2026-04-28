@@ -6,6 +6,8 @@ const helmet = require('helmet');
 const mongoSanitize = require('mongo-sanitize');
 const rateLimit = require('express-rate-limit');
 const { getAllowedOrigins, getPrimaryFrontendUrl, isProduction, validateEnv } = require('./config/env');
+const Order = require('./models/Order');
+const Counter = require('./models/Counter');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -100,6 +102,61 @@ const connectDB = async () => {
 };
 
 connectDB();
+
+const backfillMissingOrderCodes = async () => {
+  try {
+    if (mongoose.connection?.readyState !== 1) return;
+
+    const existingCodes = await Order.find({ orderCode: /^DPH#\d+$/i }).select('orderCode');
+    let maxExisting = 1000;
+    for (const row of existingCodes) {
+      const numeric = Number(String(row.orderCode || '').replace(/[^0-9]/g, ''));
+      if (!Number.isNaN(numeric) && numeric > maxExisting) {
+        maxExisting = numeric;
+      }
+    }
+
+    await Counter.findOneAndUpdate(
+      { key: 'order' },
+      { $max: { seq: maxExisting }, $setOnInsert: { seq: 1000 } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const missingCount = await Order.countDocuments({
+      $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }],
+    });
+
+    if (!missingCount) return;
+
+    const orders = await Order.find({
+      $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }],
+    })
+      .sort({ createdAt: 1 })
+      .select('_id');
+
+    for (const order of orders) {
+      const counter = await Counter.findOneAndUpdate(
+        { key: 'order' },
+        { $inc: { seq: 1 }, $setOnInsert: { seq: 1000 } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      const code = `DPH#${counter.seq}`;
+      await Order.updateOne(
+        { _id: order._id, $or: [{ orderCode: { $exists: false } }, { orderCode: null }, { orderCode: '' }] },
+        { $set: { orderCode: code } }
+      );
+    }
+
+    console.log(`Backfilled order codes for ${orders.length} order(s).`);
+  } catch (error) {
+    console.error('Order code backfill failed:', error.message);
+  }
+};
+
+setTimeout(() => {
+  backfillMissingOrderCodes();
+}, 5000);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);

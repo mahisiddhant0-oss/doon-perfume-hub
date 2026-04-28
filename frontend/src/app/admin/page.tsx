@@ -16,6 +16,7 @@ import { API_ROUTES } from "@/lib/api";
 
 type AdminOrder = {
   _id: string;
+  orderCode?: string;
   totalAmount: number;
   orderStatus: string;
   paymentStatus: string;
@@ -183,7 +184,7 @@ export default function AdminDashboard() {
                 ) : (
                   dashboard.recentOrders.map((order) => (
                     <tr key={order._id} className="hover:bg-white/[0.02] transition-colors group">
-                      <td className="px-6 py-4 text-sm font-medium text-[#D4AF37]">#{order._id.slice(-12).toUpperCase()}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-[#D4AF37]">{order.orderCode || `#${order._id.slice(-12).toUpperCase()}`}</td>
                       <td className="px-6 py-4 text-sm text-white">{order.user?.name || order.user?.email || "Customer"}</td>
                       <td className="px-6 py-4 text-sm font-bold text-white">₹{Number(order.totalAmount || 0).toLocaleString("en-IN")}</td>
                       <td className="px-6 py-4">
