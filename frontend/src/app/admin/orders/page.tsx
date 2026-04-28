@@ -58,6 +58,7 @@ export default function AdminOrders() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSavingCustom, setIsSavingCustom] = useState(false);
   const [retryingAwbOrderId, setRetryingAwbOrderId] = useState('');
+  const [awbFailedOrderIds, setAwbFailedOrderIds] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState('');
   const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
@@ -213,9 +214,11 @@ export default function AdminOrders() {
       if (!res.ok) {
         throw new Error(payload?.message || 'Failed to retry AWB generation');
       }
+      setAwbFailedOrderIds((prev) => ({ ...prev, [orderId]: false }));
       await fetchOrders();
       alert(`AWB generated: ${payload?.awbNumber || 'N/A'}`);
     } catch (retryError: any) {
+      setAwbFailedOrderIds((prev) => ({ ...prev, [orderId]: true }));
       alert(retryError.message || 'Unable to retry AWB');
     } finally {
       setRetryingAwbOrderId('');
@@ -429,9 +432,13 @@ export default function AdminOrders() {
                           onClick={() => retryAwb(order._id)}
                           disabled={retryingAwbOrderId === order._id}
                           className="px-2 py-1 text-[10px] uppercase tracking-widest font-bold rounded-md border border-[#D4AF37]/40 text-[#D4AF37] hover:bg-[#D4AF37]/10 disabled:opacity-60 transition-all"
-                          title="Generate AWB"
+                          title={awbFailedOrderIds[order._id] ? 'Retry AWB' : 'Generate AWB'}
                         >
-                          {retryingAwbOrderId === order._id ? 'Generating...' : 'Generate AWB'}
+                          {retryingAwbOrderId === order._id
+                            ? 'Generating...'
+                            : awbFailedOrderIds[order._id]
+                              ? 'Retry AWB'
+                              : 'Generate AWB'}
                         </button>
                       ) : null}
                       <button
