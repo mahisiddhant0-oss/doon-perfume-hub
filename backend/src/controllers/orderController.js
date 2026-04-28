@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
 const Cart = require('../models/Cart');
@@ -17,7 +18,7 @@ const roundWeight = (value) => Math.round((value + Number.EPSILON) * 1000) / 100
 const calculateBilling = (items = [], productMap = new Map()) => {
   const normalizedItems = items.map((item) => {
     const productId = getCheckoutItemProductId(item);
-    const product = productMap.get(productId);
+    const product = productMap.get(productId) || productMap.get(normalizeSku(productId));
 
     if (!product) {
       throw new Error(`Product not found for checkout item: ${productId}`);
@@ -81,6 +82,7 @@ const buildReceiptId = (userId) => {
 
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
+const normalizeSku = (value = '') => String(value || '').trim().toUpperCase();
 const getCheckoutItemProductId = (item = {}) =>
   String(item?.id || item?.product || item?._id || item?.productId || '').trim();
 
@@ -173,15 +175,37 @@ const createOrder = async (req, res) => {
       }));
     }
 
-    const productIds = [...new Set(checkoutItems.map((item) => getCheckoutItemProductId(item)))].filter(Boolean);
-    if (productIds.length === 0) {
+    const checkoutTokens = [...new Set(checkoutItems.map((item) => getCheckoutItemProductId(item)))].filter(Boolean);
+    if (checkoutTokens.length === 0) {
       return res.status(400).json({ message: 'No valid items found for checkout. Please re-add products to cart and try again.' });
     }
 
-    const products = await Product.find({ _id: { $in: productIds } }).select('name price variants weightKg');
-    const productMap = new Map(products.map((product) => [String(product._id), product]));
+    const objectIds = checkoutTokens.filter((token) => mongoose.Types.ObjectId.isValid(token));
+    const skuTokens = checkoutTokens
+      .filter((token) => !mongoose.Types.ObjectId.isValid(token))
+      .map((token) => normalizeSku(token));
 
-    if (productMap.size !== productIds.length) {
+    const productFilters = [];
+    if (objectIds.length > 0) productFilters.push({ _id: { $in: objectIds } });
+    if (skuTokens.length > 0) productFilters.push({ sku: { $in: skuTokens } });
+    if (productFilters.length === 0) {
+      return res.status(400).json({ message: 'No valid items found for checkout. Please re-add products to cart and try again.' });
+    }
+
+    const products = await Product.find({ $or: productFilters }).select('name price variants weightKg sku');
+    const productMap = new Map();
+    for (const product of products) {
+      productMap.set(String(product._id), product);
+      if (product.sku) {
+        productMap.set(normalizeSku(product.sku), product);
+      }
+    }
+
+    const hasMissingProduct = checkoutTokens.some((token) => {
+      const key = mongoose.Types.ObjectId.isValid(token) ? String(token) : normalizeSku(token);
+      return !productMap.has(key);
+    });
+    if (hasMissingProduct) {
       return res.status(400).json({ message: 'One or more products in your cart are unavailable.' });
     }
 
