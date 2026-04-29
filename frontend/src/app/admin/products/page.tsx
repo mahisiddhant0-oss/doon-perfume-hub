@@ -923,12 +923,15 @@ export default function AdminProducts() {
                               (entry) => entry.toLowerCase() === categoryValue.toLowerCase()
                             );
                             return (
-                              <div key={categoryValue} className="w-full px-3 py-2 text-left text-sm hover:bg-[#111] flex items-center justify-between gap-2">
+                              <div key={categoryValue} className="w-full px-3 py-2 text-sm hover:bg-[#111] flex items-center gap-2">
                                 <button
                                   type="button"
-                                  onClick={() => deleteCategoryFromDropdown(categoryValue)}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteCategoryFromDropdown(categoryValue);
+                                  }}
                                   disabled={deletingCategoryValue === categoryValue.toLowerCase()}
-                                  className="w-5 h-5 rounded border border-red-500/50 text-red-400 hover:bg-red-500/20 flex items-center justify-center disabled:opacity-50"
+                                  className="w-5 h-5 rounded border border-red-500/50 text-red-400 hover:bg-red-500/20 flex items-center justify-center disabled:opacity-50 shrink-0"
                                   title="Delete Category"
                                 >
                                   <Minus size={12} />
@@ -936,15 +939,17 @@ export default function AdminProducts() {
                                 <button
                                   type="button"
                                   onClick={() => toggleCategorySelection(categoryValue)}
-                                  className="flex-1 text-left"
+                                  className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
                                 >
-                                  {categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}
+                                  <span className="truncate">
+                                    {categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}
+                                  </span>
+                                  <span
+                                    className={`w-4 h-4 rounded border shrink-0 ${
+                                      isSelected ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-[#444]'
+                                    }`}
+                                  />
                                 </button>
-                                <span
-                                  className={`w-4 h-4 rounded border ${
-                                    isSelected ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-[#444]'
-                                  }`}
-                                />
                               </div>
                             );
                           })}
