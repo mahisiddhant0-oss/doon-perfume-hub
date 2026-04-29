@@ -129,7 +129,15 @@ export default function CategoryEditorPage() {
         },
       });
       const payload = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(payload?.message || "Failed to delete category");
+      if (!res.ok) {
+        const productNames = Array.isArray(payload?.products)
+          ? payload.products
+              .map((product: { name?: string; sku?: string }) => `${product?.name || "Unknown"}${product?.sku ? ` (${product.sku})` : ""}`)
+              .join(", ")
+          : "";
+        const detail = productNames ? ` In use by: ${productNames}` : "";
+        throw new Error((payload?.message || "Failed to delete category") + detail);
+      }
 
       router.push("/admin/categories");
     } catch (e: unknown) {
