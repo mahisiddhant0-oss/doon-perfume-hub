@@ -98,6 +98,12 @@ const normalizeCategoryLabel = (value = '') =>
     .trim()
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
+const normalizeCategoryNameKey = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ');
 
 export default function AdminProducts() {
   const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -224,23 +230,6 @@ export default function AdminProducts() {
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
-
-  useEffect(() => {
-    const categoriesFromProducts = products
-      .flatMap((product) => {
-        if (Array.isArray(product.categories) && product.categories.length > 0) {
-          return product.categories.map((entry) => String(entry || '').trim()).filter(Boolean);
-        }
-        return [String(product.category || '').trim()].filter(Boolean);
-      })
-      .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
-
-    setCustomCategoryPool((prevPool) => {
-      const nextPool = mergeCategoryValues(prevPool, categoriesFromProducts);
-      persistCustomCategories(nextPool);
-      return nextPool;
-    });
-  }, [products]);
 
   const handleOpenModal = (product: AdminProduct | null = null) => {
     if (product) {
@@ -450,20 +439,25 @@ export default function AdminProducts() {
 
   const customCategoryOptions = useMemo(() => {
     const defaultValues = new Set(CATEGORY_OPTIONS.map((option) => option.value.toLowerCase()));
-    const categories = products
-      .flatMap((product) => {
-        if (Array.isArray(product.categories) && product.categories.length > 0) {
-          return product.categories.map((entry) => String(entry || '').trim()).filter(Boolean);
-        }
-        return [String(product.category || '').trim()].filter(Boolean);
-      })
-      .filter((category) => !EXCLUDED_CATEGORY_VALUES.has(category.toLowerCase()))
-      .filter((category) => !defaultValues.has(category.toLowerCase()));
+    const options = mergeCategoryValues(customCategoryPool);
 
-    return mergeCategoryValues(categories, customCategoryPool)
-      .filter((category) => !defaultValues.has(category.toLowerCase()))
-      .sort((a, b) => a.localeCompare(b));
-  }, [products, customCategoryPool]);
+    const byDisplayName = new Map<string, string>();
+    options.forEach((value) => {
+      const normalizedValue = value.toLowerCase();
+      if (defaultValues.has(normalizedValue)) return;
+      const displayName = categoryNamesByValue[normalizedValue] || normalizeCategoryLabel(value);
+      const nameKey = normalizeCategoryNameKey(displayName);
+      if (!byDisplayName.has(nameKey)) {
+        byDisplayName.set(nameKey, value);
+      }
+    });
+
+    return Array.from(byDisplayName.values()).sort((a, b) => {
+      const aLabel = categoryNamesByValue[a.toLowerCase()] || normalizeCategoryLabel(a);
+      const bLabel = categoryNamesByValue[b.toLowerCase()] || normalizeCategoryLabel(b);
+      return aLabel.localeCompare(bLabel);
+    });
+  }, [customCategoryPool, categoryNamesByValue]);
 
   const allCategoryOptions = useMemo(
     () =>
