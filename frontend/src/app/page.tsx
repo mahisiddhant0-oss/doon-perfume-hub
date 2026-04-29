@@ -375,28 +375,44 @@ export default function Home() {
                 src={slide.image}
                 alt={slide.titleAccent}
                 fill
-                className="object-cover object-center opacity-70 scale-105"
+                className={
+                  idx === 0
+                    ? 'object-contain object-center bg-black'
+                    : 'object-cover object-center opacity-70 scale-105'
+                }
                 priority={idx === 0}
                 unoptimized
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
-              <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-4 md:px-20 z-10 max-w-7xl mx-auto">
-                <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-1 md:mb-3">
-                  {slide.kicker}
-                </p>
-                <h1 className="text-white font-serif text-[28px] md:text-7xl mb-2 md:mb-4 leading-tight drop-shadow-2xl">
-                  {slide.titleTop} <br />
-                  <span className="italic text-[#d8e9ff]">{slide.titleAccent}</span>
-                </h1>
-                <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-6 leading-relaxed font-light">
-                  {slide.description}
-                </p>
-                <Link href={slide.href}>
-                  <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-5 md:px-14 py-2 md:py-4 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
-                    {slide.cta} <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
-                  </button>
-                </Link>
-              </div>
+              {idx === 0 ? (
+                <div className="absolute inset-x-0 bottom-8 md:bottom-12 z-10 flex justify-center">
+                  <Link href={slide.href}>
+                    <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-6 md:px-14 py-2 md:py-4 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
+                      EXPLORE NOW <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                    </button>
+                  </Link>
+                </div>
+              ) : (
+                <>
+                  <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
+                  <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-4 md:px-20 z-10 max-w-7xl mx-auto">
+                    <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-1 md:mb-3">
+                      {slide.kicker}
+                    </p>
+                    <h1 className="text-white font-serif text-[28px] md:text-7xl mb-2 md:mb-4 leading-tight drop-shadow-2xl">
+                      {slide.titleTop} <br />
+                      <span className="italic text-[#d8e9ff]">{slide.titleAccent}</span>
+                    </h1>
+                    <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-6 leading-relaxed font-light">
+                      {slide.description}
+                    </p>
+                    <Link href={slide.href}>
+                      <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-5 md:px-14 py-2 md:py-4 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
+                        {slide.cta} <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                      </button>
+                    </Link>
+                  </div>
+                </>
+              )}
             </div>
           ))}
         </div>
