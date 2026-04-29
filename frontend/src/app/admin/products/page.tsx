@@ -415,9 +415,20 @@ export default function AdminProducts() {
 
   const visibleProducts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
+    const categoryTagQuery = query.startsWith('#') ? query.slice(1).trim() : '';
     let result = [...products];
 
-    if (query) {
+    if (categoryTagQuery) {
+      result = result.filter((product) => {
+        const categoryValues = Array.isArray(product.categories) && product.categories.length > 0
+          ? product.categories
+          : [product.category];
+        const normalizedCategories = categoryValues
+          .map((entry) => String(entry || '').trim().toLowerCase())
+          .filter(Boolean);
+        return normalizedCategories.some((entry) => entry.includes(categoryTagQuery));
+      });
+    } else if (query) {
       result = result.filter((product) => {
         const name = product.name?.toLowerCase() || '';
         const sku = product.sku?.toLowerCase() || '';
@@ -548,7 +559,7 @@ export default function AdminProducts() {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by product name, SKU, or category..."
+              placeholder="Search by product name, SKU, category, or #Category..."
               className="w-full bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl pl-12 pr-4 py-3 text-sm focus:outline-none focus:border-[#D4AF37] transition-all"
             />
           </div>
