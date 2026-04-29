@@ -34,6 +34,7 @@ export default function CategoryEditorPage() {
   });
   const [loading, setLoading] = useState(!isCreateMode);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -107,6 +108,37 @@ export default function CategoryEditorPage() {
     }
   };
 
+  const onDeleteCategory = async () => {
+    if (isCreateMode || !id) return;
+    const confirmed = window.confirm(
+      "Delete this category? This cannot be undone. If products are still using this category, deletion will be blocked."
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    setError("");
+    try {
+      const userStr = localStorage.getItem("user");
+      const token = userStr ? JSON.parse(userStr)?.token : "";
+      if (!token) throw new Error("Not authenticated");
+
+      const res = await fetch(API_ROUTES.PRODUCT_CATEGORY_BY_ID(id), {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(payload?.message || "Failed to delete category");
+
+      router.push("/admin/categories");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to delete category");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center justify-between">
@@ -173,13 +205,25 @@ export default function CategoryEditorPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full bg-[#D4AF37] text-black py-3 rounded-xl text-xs tracking-[0.16em] uppercase font-bold hover:bg-[#c6a43a] transition-colors disabled:opacity-70"
-          >
-            {saving ? "Saving..." : isCreateMode ? "Create Category" : "Update Category"}
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <button
+              type="submit"
+              disabled={saving}
+              className="w-full bg-[#D4AF37] text-black py-3 rounded-xl text-xs tracking-[0.16em] uppercase font-bold hover:bg-[#c6a43a] transition-colors disabled:opacity-70"
+            >
+              {saving ? "Saving..." : isCreateMode ? "Create Category" : "Update Category"}
+            </button>
+            {!isCreateMode ? (
+              <button
+                type="button"
+                onClick={onDeleteCategory}
+                disabled={deleting}
+                className="w-full bg-red-500/10 border border-red-500/40 text-red-400 py-3 rounded-xl text-xs tracking-[0.16em] uppercase font-bold hover:bg-red-500/20 transition-colors disabled:opacity-70"
+              >
+                {deleting ? "Deleting..." : "Delete Category"}
+              </button>
+            ) : null}
+          </div>
         </form>
       ) : null}
     </div>

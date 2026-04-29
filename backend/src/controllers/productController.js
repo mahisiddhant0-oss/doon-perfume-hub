@@ -171,6 +171,31 @@ const updateProductCategory = async (req, res) => {
   }
 };
 
+const deleteProductCategory = async (req, res) => {
+  try {
+    const category = await ProductCategory.findById(req.params.id);
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+
+    const value = String(category.value || '').toLowerCase();
+    const usageCount = await Product.countDocuments({
+      $or: [{ category: value }, { categories: value }],
+    });
+
+    if (usageCount > 0) {
+      return res.status(400).json({
+        message: `Category is used by ${usageCount} product(s). Reassign those products before deleting.`,
+      });
+    }
+
+    await ProductCategory.deleteOne({ _id: category._id });
+    return res.json({ message: 'Category deleted' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Server Error deleting category', error: error.message });
+  }
+};
+
 const normalizeVariants = (variants = []) => {
   if (!Array.isArray(variants)) {
     return [];
@@ -418,6 +443,7 @@ module.exports = {
   createProductCategory,
   getProductCategoryById,
   updateProductCategory,
+  deleteProductCategory,
   getProducts,
   getProductById,
   createProduct,
