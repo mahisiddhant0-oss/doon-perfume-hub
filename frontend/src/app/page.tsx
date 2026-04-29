@@ -68,6 +68,7 @@ export default function Home() {
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileSearchKeyword, setMobileSearchKeyword] = useState('');
+  const [desktopSearchKeyword, setDesktopSearchKeyword] = useState('');
   const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const desktopCategorySliderRef = useRef<HTMLDivElement | null>(null);
   const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
@@ -209,6 +210,13 @@ export default function Home() {
     router.push(target);
   };
 
+  const handleDesktopSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const keyword = desktopSearchKeyword.trim();
+    const target = keyword ? `/products?keyword=${encodeURIComponent(keyword)}` : '/products';
+    router.push(target);
+  };
+
   useEffect(() => {
     const loadCartCount = () => {
       try {
@@ -316,7 +324,7 @@ export default function Home() {
     <div className="bg-[var(--color-brand-bg)] overflow-x-hidden">
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-[var(--color-brand-border)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="h-16 md:h-20 flex items-center justify-between gap-2">
+          <div className="relative h-16 md:h-20 flex items-center justify-between gap-2">
             <Link href="/" className="flex items-center">
               <Image
                 src="/DPH_LOGO.avif"
@@ -328,11 +336,26 @@ export default function Home() {
               />
             </Link>
 
+            <div className="hidden md:block absolute left-1/2 -translate-x-1/2 w-[46%] min-w-[420px] max-w-[640px]">
+              <form onSubmit={handleDesktopSearchSubmit} className="relative group">
+                <input
+                  type="text"
+                  value={desktopSearchKeyword}
+                  onChange={(event) => setDesktopSearchKeyword(event.target.value)}
+                  placeholder="Search perfumes, oils, bottles..."
+                  className="w-full h-12 rounded-xl border border-[#d6dbe5] bg-gradient-to-r from-white to-[#f7f9ff] pl-5 pr-16 text-[15px] text-[#334155] shadow-sm transition-all outline-none focus:border-[#1f5cb0] focus:shadow-[0_0_0_4px_rgba(31,92,176,0.12)]"
+                />
+                <button
+                  type="submit"
+                  aria-label="Search products"
+                  className="absolute right-1.5 top-1.5 h-9 w-11 rounded-lg bg-[#ef5b49] text-white flex items-center justify-center transition-all hover:bg-[#e64835] group-focus-within:scale-105"
+                >
+                  <Search size={18} />
+                </button>
+              </form>
+            </div>
+
             <nav className="hidden md:flex items-center gap-6 text-sm font-medium tracking-wide text-gray-700">
-              <Link href="/products" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors whitespace-nowrap">
-                <Search size={16} />
-                <span>Search</span>
-              </Link>
               <MyAccountDropdown />
               <a href="mailto:admin@doonperfumehub.com" className="inline-flex items-center gap-2 hover:text-[var(--color-brand-primary)] transition-colors whitespace-nowrap">
                 <Phone size={16} />
