@@ -15,12 +15,6 @@ const normalizeWeightKg = (value) => {
 const normalizeSku = (value = '') => String(value || '').trim();
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
-const normalizeCategoryNameKey = (value = '') =>
-  String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[-_]+/g, ' ')
-    .replace(/\s+/g, ' ');
 const formatCategoryName = (value = '') =>
   String(value || '')
     .trim()
@@ -73,65 +67,9 @@ const getProductCategories = async (req, res) => {
 
     const categoryDocs = await ProductCategory.find({}, { value: 1, name: 1, description: 1, image: 1 }).lean();
 
-    // Merge duplicate categories by display name (e.g. "bottles" vs another value named "Bottles")
-    const byName = new Map();
-    for (const doc of categoryDocs) {
-      const key = normalizeCategoryNameKey(doc?.name || doc?.value || '');
-      if (!key) continue;
-      if (!byName.has(key)) {
-        byName.set(key, []);
-      }
-      byName.get(key).push(doc);
-    }
-
-    for (const [, docs] of byName.entries()) {
-      if (!Array.isArray(docs) || docs.length <= 1) continue;
-
-      const preferred =
-        docs.find((entry) => DEFAULT_CATEGORY_VALUES.includes(String(entry.value || '').toLowerCase())) || docs[0];
-      const preferredValue = String(preferred.value || '').toLowerCase();
-
-      for (const duplicate of docs) {
-        if (String(duplicate._id) === String(preferred._id)) continue;
-        const duplicateValue = String(duplicate.value || '').toLowerCase();
-
-        await Product.updateMany(
-          { category: duplicateValue },
-          { $set: { category: preferredValue } }
-        );
-
-        await Product.updateMany(
-          { categories: duplicateValue },
-          [
-            {
-              $set: {
-                categories: {
-                  $map: {
-                    input: '$categories',
-                    as: 'cat',
-                    in: {
-                      $cond: [
-                        { $eq: [{ $toLower: '$$cat' }, duplicateValue] },
-                        preferredValue,
-                        '$$cat',
-                      ],
-                    },
-                  },
-                },
-              },
-            },
-          ]
-        );
-
-        await ProductCategory.deleteOne({ _id: duplicate._id });
-      }
-    }
-
-    const freshCategoryDocs = await ProductCategory.find({}, { value: 1, name: 1, description: 1, image: 1 }).lean();
-
     const mergedValues = [
       ...DEFAULT_CATEGORY_VALUES,
-      ...freshCategoryDocs.map((doc) => doc.value),
+      ...categoryDocs.map((doc) => doc.value),
       ...fromProductsCategories,
       ...fromProductsPrimary,
     ]
@@ -141,7 +79,7 @@ const getProductCategories = async (req, res) => {
 
     const unique = Array.from(new Set(mergedValues));
     const docsByValue = new Map(
-      freshCategoryDocs.map((doc) => [String(doc.value || '').toLowerCase(), doc])
+      categoryDocs.map((doc) => [String(doc.value || '').toLowerCase(), doc])
     );
     const payload = unique.map((value) => {
       const existing = docsByValue.get(value);

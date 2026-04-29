@@ -26,6 +26,8 @@ type CategoryMeta = {
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
+const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
+const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const CATEGORY_ICON_MAP: Record<string, string> = {
   general: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   perfumes: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png',
@@ -41,6 +43,14 @@ const getPrimaryCategory = (product: Product) => {
   return String(product.category || 'general');
 };
 
+const getProductCategories = (product: Product) => {
+  const raw =
+    Array.isArray(product.categories) && product.categories.length > 0
+      ? product.categories
+      : [product.category];
+  return raw.map((entry) => String(entry || '').trim()).filter(Boolean);
+};
+
 const formatCategoryLabel = (value: string) =>
   String(value || 'general')
     .replace(/[-_]+/g, ' ')
@@ -54,6 +64,7 @@ export default function Home() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [backendCategories, setBackendCategories] = useState<string[]>([]);
   const [categoryMetaMap, setCategoryMetaMap] = useState<Record<string, CategoryMeta>>({});
+  const [storedCustomCategories, setStoredCustomCategories] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileSearchKeyword, setMobileSearchKeyword] = useState('');
@@ -61,26 +72,53 @@ export default function Home() {
   const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
 
   const categories = useMemo(() => {
-    const managed = backendCategories
-      .map((entry) => String(entry || '').trim().toLowerCase())
-      .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
-      .filter((entry) => entry !== 'all');
+    const map = new Map<string, { name: string; icon: string; slug: string; hasCustomImage: boolean }>();
 
-    const uniqueManaged = Array.from(new Set(managed));
+    for (const categoryValue of DEFAULT_CATEGORY_VALUES) {
+      const meta = categoryMetaMap[categoryValue];
+      map.set(categoryValue, {
+        slug: categoryValue,
+        name: normalizeDisplayLabel(meta?.name || categoryValue),
+        icon: meta?.image || CATEGORY_ICON_MAP[categoryValue] || CATEGORY_ICON_MAP.general,
+        hasCustomImage: Boolean(meta?.image),
+      });
+    }
+
+    for (const product of allProducts) {
+      for (const categoryValue of getProductCategories(product)) {
+        const normalized = categoryValue.toLowerCase();
+        if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
+        if (!map.has(normalized)) {
+          const meta = categoryMetaMap[normalized];
+          map.set(normalized, {
+            slug: categoryValue,
+            name: normalizeDisplayLabel(meta?.name || categoryValue),
+            icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+            hasCustomImage: Boolean(meta?.image),
+          });
+        }
+      }
+    }
+
+    for (const categoryValue of [...backendCategories, ...storedCustomCategories]) {
+      const normalized = String(categoryValue || '').trim().toLowerCase();
+      if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
+      if (!map.has(normalized)) {
+        const meta = categoryMetaMap[normalized];
+        map.set(normalized, {
+          slug: categoryValue,
+          name: normalizeDisplayLabel(meta?.name || categoryValue),
+          icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
+          hasCustomImage: Boolean(meta?.image),
+        });
+      }
+    }
 
     return [
       { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '', hasCustomImage: false },
-      ...uniqueManaged.map((value) => {
-        const meta = categoryMetaMap[value];
-        return {
-          name: normalizeDisplayLabel(meta?.name || value),
-          icon: meta?.image || CATEGORY_ICON_MAP[value] || CATEGORY_ICON_MAP.general,
-          slug: value,
-          hasCustomImage: Boolean(meta?.image),
-        };
-      }),
+      ...Array.from(map.values()),
     ];
-  }, [backendCategories, categoryMetaMap]);
+  }, [allProducts, backendCategories, storedCustomCategories, categoryMetaMap]);
 
   const categoryColumns = useMemo(() => {
     const columns: Array<Array<(typeof categories)[number] | null>> = [];
@@ -139,6 +177,32 @@ export default function Home() {
     window.addEventListener('storage', loadCartCount);
 
     return () => window.removeEventListener('storage', loadCartCount);
+  }, []);
+
+  useEffect(() => {
+    const loadStoredCustomCategories = () => {
+      try {
+        const raw = window.localStorage.getItem(LOCAL_CUSTOM_CATEGORIES_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        const normalized = Array.isArray(parsed)
+          ? parsed
+              .map((entry) => String(entry || '').trim().toLowerCase())
+              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
+          : [];
+        setStoredCustomCategories(Array.from(new Set(normalized)));
+      } catch {
+        setStoredCustomCategories([]);
+      }
+    };
+
+    loadStoredCustomCategories();
+    window.addEventListener('storage', loadStoredCustomCategories);
+    window.addEventListener('focus', loadStoredCustomCategories);
+
+    return () => {
+      window.removeEventListener('storage', loadStoredCustomCategories);
+      window.removeEventListener('focus', loadStoredCustomCategories);
+    };
   }, []);
 
   useEffect(() => {
