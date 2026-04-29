@@ -377,7 +377,7 @@ export default function Home() {
                 fill
                 className={
                   idx === 0
-                    ? 'object-contain object-center bg-black'
+                    ? 'object-cover object-center'
                     : 'object-cover object-center opacity-70 scale-105'
                 }
                 priority={idx === 0}
