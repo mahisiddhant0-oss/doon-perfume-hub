@@ -105,6 +105,7 @@ export default function AdminProducts() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<AdminProduct | null>(null);
+  const [isDeletingFromModal, setIsDeletingFromModal] = useState(false);
   const [formData, setFormData] = useState<ProductForm>(emptyForm);
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [isCreatingCustomCategory, setIsCreatingCustomCategory] = useState(false);
@@ -387,6 +388,17 @@ export default function AdminProducts() {
       alert('Product deleted permanently.');
     } catch (error: any) {
       alert(error?.message || 'Failed to delete product');
+    }
+  };
+
+  const handleDeleteFromModal = async () => {
+    if (!editingProduct) return;
+    try {
+      setIsDeletingFromModal(true);
+      await handleDeleteProduct(editingProduct);
+      setIsModalOpen(false);
+    } finally {
+      setIsDeletingFromModal(false);
     }
   };
 
@@ -938,10 +950,20 @@ export default function AdminProducts() {
                 )}
               </div>
 
-              <div className="pt-4">
+              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button type="submit" className="w-full bg-[#D4AF37] text-black py-4 rounded-xl font-bold tracking-widest text-xs uppercase hover:bg-white transition-all shadow-xl">
                   {editingProduct ? 'Update Listing' : 'Authenticate & Save Listing'}
                 </button>
+                {editingProduct ? (
+                  <button
+                    type="button"
+                    onClick={handleDeleteFromModal}
+                    disabled={isDeletingFromModal}
+                    className="w-full bg-red-500/10 border border-red-500/40 text-red-400 py-4 rounded-xl font-bold tracking-widest text-xs uppercase hover:bg-red-500/20 transition-all disabled:opacity-70"
+                  >
+                    {isDeletingFromModal ? 'Deleting...' : 'Delete Listing'}
+                  </button>
+                ) : null}
               </div>
             </form>
           </div>
