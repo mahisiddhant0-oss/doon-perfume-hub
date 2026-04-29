@@ -336,7 +336,7 @@ export default function Home() {
               />
             </Link>
 
-            <div className="hidden md:block absolute left-1/2 -translate-x-1/2 w-[46%] min-w-[420px] max-w-[640px]">
+            <div className="hidden md:block absolute left-1/2 -translate-x-1/2 w-[39%] min-w-[360px] max-w-[520px]">
               <form onSubmit={handleDesktopSearchSubmit} className="relative group">
                 <input
                   type="text"
