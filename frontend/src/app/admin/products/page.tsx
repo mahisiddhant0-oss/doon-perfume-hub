@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { API_ROUTES } from '@/lib/api';
 import {
   Plus,
+  Minus,
   Search,
   Edit2,
   Trash2,
@@ -122,6 +123,7 @@ export default function AdminProducts() {
   const [categoryNamesByValue, setCategoryNamesByValue] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
+  const [deletingCategoryValue, setDeletingCategoryValue] = useState('');
 
   const readStoredCustomCategories = () => {
     if (typeof window === 'undefined') return [] as string[];
@@ -618,6 +620,70 @@ export default function AdminProducts() {
     });
   };
 
+  const deleteCategoryFromDropdown = async (categoryValue: string) => {
+    const normalizedValue = String(categoryValue || '').trim().toLowerCase();
+    if (!normalizedValue) return;
+
+    const confirmed = window.confirm(
+      `Delete category "${categoryNamesByValue[normalizedValue] || normalizeCategoryLabel(categoryValue)}" permanently?`
+    );
+    if (!confirmed) return;
+
+    try {
+      setDeletingCategoryValue(normalizedValue);
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      const allCategoryPayload = await fetch(`${API_ROUTES.PRODUCT_CATEGORIES}?_ts=${Date.now()}`, {
+        cache: 'no-store',
+      }).then((res) => res.json());
+      const categoryList = Array.isArray(allCategoryPayload) ? allCategoryPayload : [];
+      const categoryDoc = categoryList.find((entry) => {
+        if (!entry || typeof entry === 'string') return false;
+        return String(entry.value || '').trim().toLowerCase() === normalizedValue;
+      });
+
+      if (!categoryDoc?._id) {
+        throw new Error('Category record not found');
+      }
+
+      const res = await fetch(API_ROUTES.PRODUCT_CATEGORY_BY_ID(categoryDoc._id), {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const payload = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(payload?.message || 'Failed to delete category');
+      }
+
+      setFormData((prev) => {
+        const nextCategories = prev.categories.filter((entry) => entry.toLowerCase() !== normalizedValue);
+        return {
+          ...prev,
+          categories: nextCategories.length > 0 ? nextCategories : [prev.category || 'perfumes'],
+          category:
+            nextCategories.length > 0
+              ? nextCategories[0]
+              : prev.category.toLowerCase() === normalizedValue
+                ? 'perfumes'
+                : prev.category,
+        };
+      });
+
+      await fetchCategories();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete category';
+      alert(message);
+    } finally {
+      setDeletingCategoryValue('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -857,19 +923,29 @@ export default function AdminProducts() {
                               (entry) => entry.toLowerCase() === categoryValue.toLowerCase()
                             );
                             return (
-                              <button
-                                type="button"
-                                key={categoryValue}
-                                onClick={() => toggleCategorySelection(categoryValue)}
-                                className="w-full px-3 py-2 text-left text-sm hover:bg-[#111] flex items-center justify-between"
-                              >
-                                <span>{categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}</span>
+                              <div key={categoryValue} className="w-full px-3 py-2 text-left text-sm hover:bg-[#111] flex items-center justify-between gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCategoryFromDropdown(categoryValue)}
+                                  disabled={deletingCategoryValue === categoryValue.toLowerCase()}
+                                  className="w-5 h-5 rounded border border-red-500/50 text-red-400 hover:bg-red-500/20 flex items-center justify-center disabled:opacity-50"
+                                  title="Delete Category"
+                                >
+                                  <Minus size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCategorySelection(categoryValue)}
+                                  className="flex-1 text-left"
+                                >
+                                  {categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}
+                                </button>
                                 <span
                                   className={`w-4 h-4 rounded border ${
                                     isSelected ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-[#444]'
                                   }`}
                                 />
-                              </button>
+                              </div>
                             );
                           })}
                         </div>
