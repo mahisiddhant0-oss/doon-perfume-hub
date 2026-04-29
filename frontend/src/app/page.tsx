@@ -78,7 +78,7 @@ export default function Home() {
       titleAccent: 'Elegance',
       description:
         'Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.',
-      image: 'https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=2000&q=80',
+      image: '/hero-slide-1.png',
       cta: 'EXPLORE COLLECTION',
       href: '/products',
     },
