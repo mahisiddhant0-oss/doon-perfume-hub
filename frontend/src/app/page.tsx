@@ -384,11 +384,17 @@ export default function Home() {
                 unoptimized
               />
               {idx === 0 ? (
-                <Link
-                  href={slide.href}
-                  aria-label="Explore collection"
-                  className="absolute inset-0 z-10"
-                />
+                <div className="absolute inset-0 z-10 pointer-events-none">
+                  <Link
+                    href={slide.href}
+                    aria-label="Explore now"
+                    className="pointer-events-auto absolute left-4 bottom-4 md:left-[14.5%] md:bottom-[14%]"
+                  >
+                    <button className="group flex items-center gap-3 border border-[#a97a3d] text-[#d2a767] bg-black/25 backdrop-blur-sm px-4 md:px-8 py-2 md:py-3 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-black/45 transition-all duration-300 shadow-xl">
+                      EXPLORE NOW <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                    </button>
+                  </Link>
+                </div>
               ) : (
                 <>
                   <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
