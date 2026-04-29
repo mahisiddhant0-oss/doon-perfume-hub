@@ -184,13 +184,27 @@ const deleteProductCategory = async (req, res) => {
     }
 
     const value = String(category.value || '').toLowerCase();
-    const usageCount = await Product.countDocuments({
+    const usageQuery = {
       $or: [{ category: value }, { categories: value }],
-    });
+    };
+    const usageCount = await Product.countDocuments(usageQuery);
 
     if (usageCount > 0) {
+      const blockingProducts = await Product.find(usageQuery)
+        .select('name sku category categories isActive')
+        .limit(20)
+        .lean();
+
       return res.status(400).json({
         message: `Category is used by ${usageCount} product(s). Reassign those products before deleting.`,
+        products: blockingProducts.map((product) => ({
+          id: product._id,
+          name: product.name,
+          sku: product.sku,
+          category: product.category,
+          categories: product.categories,
+          isActive: product.isActive,
+        })),
       });
     }
 
