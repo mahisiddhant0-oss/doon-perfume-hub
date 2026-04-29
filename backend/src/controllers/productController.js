@@ -116,6 +116,11 @@ const createProductCategory = async (req, res) => {
     const doc = await ProductCategory.findOneAndUpdate(
       { value: rawValue },
       {
+        $set: {
+          ...(rawName ? { name: rawName } : {}),
+          ...(rawDescription ? { description: rawDescription } : {}),
+          ...(rawImage ? { image: rawImage } : {}),
+        },
         $setOnInsert: {
           value: rawValue,
           name: rawName || formatCategoryName(rawValue),

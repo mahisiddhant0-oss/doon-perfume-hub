@@ -68,7 +68,6 @@ export default function AdminCategoriesPage() {
                 )}
               </div>
               <p className="text-[#D4AF37] font-semibold text-sm">{category.name || category.value}</p>
-              <p className="text-[#888] text-[10px] uppercase tracking-widest mt-1">{category.value}</p>
             </Link>
           ))}
         </div>
@@ -76,4 +75,3 @@ export default function AdminCategoriesPage() {
     </div>
   );
 }
-

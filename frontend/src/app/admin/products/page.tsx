@@ -57,6 +57,7 @@ type ProductForm = {
   images: string[];
 };
 type CategoryPayload = string | { value?: string };
+type CategoryObjectPayload = { value?: string; name?: string };
 
 const CATEGORY_OPTIONS = [
   { value: 'perfumes', label: 'Perfumes' },
@@ -92,6 +93,11 @@ const normalizeCategoryValuesFromPayload = (payload: unknown): string[] => {
     .map((entry) => String(entry || '').trim().toLowerCase())
     .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
 };
+const normalizeCategoryLabel = (value = '') =>
+  String(value || '')
+    .trim()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 
 export default function AdminProducts() {
   const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -104,6 +110,7 @@ export default function AdminProducts() {
   const [isCreatingCustomCategory, setIsCreatingCustomCategory] = useState(false);
   const [customCategoryInput, setCustomCategoryInput] = useState('');
   const [customCategoryPool, setCustomCategoryPool] = useState<string[]>([]);
+  const [categoryNamesByValue, setCategoryNamesByValue] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
 
@@ -174,6 +181,19 @@ export default function AdminProducts() {
       if (!res.ok) return;
       const payload = await res.json();
       const normalized = normalizeCategoryValuesFromPayload(payload);
+      const nameMap: Record<string, string> = {};
+      if (Array.isArray(payload)) {
+        payload.forEach((entry) => {
+          if (typeof entry === 'object' && entry) {
+            const value = String((entry as CategoryObjectPayload).value || '').trim().toLowerCase();
+            const name = String((entry as CategoryObjectPayload).name || '').trim();
+            if (value) {
+              nameMap[value] = name || normalizeCategoryLabel(value);
+            }
+          }
+        });
+      }
+      setCategoryNamesByValue((prev) => ({ ...prev, ...nameMap }));
       setCustomCategoryPool((prev) => {
         const nextPool = mergeCategoryValues(prev, normalized);
         persistCustomCategories(nextPool);
@@ -461,7 +481,7 @@ export default function AdminProducts() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ value: normalizedCategory }),
+          body: JSON.stringify({ value: normalizedCategory, name: typedCategory }),
         });
       }
     } catch {
@@ -469,6 +489,10 @@ export default function AdminProducts() {
     }
 
     const nextPool = mergeCategoryValues(customCategoryPool, [normalizedCategory]);
+    setCategoryNamesByValue((prev) => ({
+      ...prev,
+      [normalizedCategory]: typedCategory,
+    }));
     setCustomCategoryPool(nextPool);
     persistCustomCategories(nextPool);
 
@@ -733,7 +757,11 @@ export default function AdminProducts() {
                       className="w-full bg-black border border-[#1a1a1a] px-3 py-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none flex items-center justify-between text-left"
                     >
                       <span className="truncate">
-                        {formData.categories.length > 0 ? formData.categories.join(', ') : 'Select category'}
+                        {formData.categories.length > 0
+                          ? formData.categories
+                              .map((value) => categoryNamesByValue[value.toLowerCase()] || normalizeCategoryLabel(value))
+                              .join(', ')
+                          : 'Select category'}
                       </span>
                       <ChevronDown
                         size={16}
@@ -755,7 +783,7 @@ export default function AdminProducts() {
                                 onClick={() => toggleCategorySelection(categoryValue)}
                                 className="w-full px-3 py-2 text-left text-sm hover:bg-[#111] flex items-center justify-between"
                               >
-                                <span>{categoryValue}</span>
+                                <span>{categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}</span>
                                 <span
                                   className={`w-4 h-4 rounded border ${
                                     isSelected ? 'bg-[#D4AF37] border-[#D4AF37]' : 'border-[#444]'

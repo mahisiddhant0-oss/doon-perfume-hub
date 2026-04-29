@@ -76,7 +76,7 @@ export default function CategoryEditorPage() {
       if (!token) throw new Error("Not authenticated");
 
       const payload = {
-        value: (form.value || suggestedValue).trim().toLowerCase(),
+        value: isCreateMode ? suggestedValue : String(form.value || '').trim().toLowerCase(),
         name: form.name.trim(),
         description: form.description.trim(),
         image: form.image.trim(),
@@ -160,17 +160,6 @@ export default function CategoryEditorPage() {
               type="text"
               value={form.name}
               onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-              className="w-full bg-black border border-[#1a1a1a] p-3 rounded-lg text-sm focus:border-[#D4AF37] outline-none"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Slug / Value</label>
-            <input
-              type="text"
-              value={form.value}
-              onChange={(e) => setForm((prev) => ({ ...prev, value: slugify(e.target.value) }))}
-              placeholder={suggestedValue || "auto-generated-from-name"}
               className="w-full bg-black border border-[#1a1a1a] p-3 rounded-lg text-sm focus:border-[#D4AF37] outline-none"
             />
           </div>
