@@ -4,7 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Star, Search, Phone, ShoppingBag } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Star, Search, Phone, ShoppingBag } from 'lucide-react';
 import { API_ROUTES } from '@/lib/api';
 import MyAccountDropdown from '@/components/MyAccountDropdown';
 
@@ -68,8 +68,58 @@ export default function Home() {
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileSearchKeyword, setMobileSearchKeyword] = useState('');
+  const [activeHeroSlide, setActiveHeroSlide] = useState(0);
   const desktopCategorySliderRef = useRef<HTMLDivElement | null>(null);
   const mobileCategorySliderRef = useRef<HTMLDivElement | null>(null);
+  const heroSlides = [
+    {
+      kicker: 'PREMIUM FRAGRANCES',
+      titleTop: 'A Scent Full Of',
+      titleAccent: 'Elegance',
+      description:
+        'Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.',
+      image: 'https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=2000&q=80',
+      cta: 'EXPLORE COLLECTION',
+      href: '/products',
+    },
+    {
+      kicker: 'PERFUME COLLECTION',
+      titleTop: 'Signature',
+      titleAccent: 'Perfumes',
+      description:
+        'From fresh daytime notes to bold evening blends, discover perfumes made to match every mood and moment.',
+      image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=2000&q=80',
+      cta: 'SHOP PERFUMES',
+      href: '/products?category=perfumes',
+    },
+    {
+      kicker: 'ESSENTIAL OILS',
+      titleTop: 'Pure Drops Of',
+      titleAccent: 'Wellness',
+      description:
+        'Explore concentrated essential oils selected for aroma, quality, and consistency in every single drop.',
+      image: 'https://images.unsplash.com/photo-1611078489935-0cb964de46d6?w=2000&q=80',
+      cta: 'SHOP ESSENTIAL OILS',
+      href: '/products?category=essential-oils',
+    },
+    {
+      kicker: 'BOTTLE STUDIO',
+      titleTop: 'Crafted Glass For',
+      titleAccent: 'Luxury',
+      description:
+        'Find premium perfume bottles that elevate presentation with elegant shapes, sturdy build, and timeless style.',
+      image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=2000&q=80',
+      cta: 'SHOP BOTTLES',
+      href: '/products?category=bottles',
+    },
+  ];
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setActiveHeroSlide((prev) => (prev + 1) % heroSlides.length);
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [heroSlides.length]);
 
   const categories = useMemo(() => {
     const map = new Map<string, { name: string; icon: string; slug: string; hasCustomImage: boolean }>();
@@ -313,30 +363,71 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero Banner */}
-      <section className="relative w-full h-[14vh] min-h-[140px] md:h-[72vh] bg-black flex items-center overflow-hidden">
-        <Image
-          src="https://images.unsplash.com/photo-1615397587889-cbcedb5679ac?w=2000&q=80"
-          alt="Hero Banner"
-          fill
-          className="object-cover object-center opacity-70 scale-105"
-          priority
-          unoptimized
-        />
-        <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
-        <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-4 md:px-20 z-10 max-w-7xl mx-auto">
-          <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-1 md:mb-3 animate-fade-in">PREMIUM FRAGRANCES</p>
-          <h1 className="text-white font-serif text-[28px] md:text-7xl mb-2 md:mb-4 leading-tight drop-shadow-2xl">
-            A Scent Full Of <br /><span className="italic text-[#d8e9ff]">Elegance</span>
-          </h1>
-          <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-6 leading-relaxed font-light">
-            Indulge in artisanal scents crafted with heritage and purity. Our fragrances are designed to linger in memories.
-          </p>
-          <Link href="/products">
-              <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-5 md:px-14 py-2 md:py-4 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
-                EXPLORE COLLECTION <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
-              </button>
-          </Link>
+      {/* Hero Banner Slider */}
+      <section className="relative w-full h-[14vh] min-h-[140px] md:h-[72vh] bg-black overflow-hidden">
+        <div
+          className="absolute inset-0 flex transition-transform duration-700 ease-out"
+          style={{ transform: `translateX(-${activeHeroSlide * 100}%)` }}
+        >
+          {heroSlides.map((slide, idx) => (
+            <div key={slide.kicker} className="relative min-w-full h-full">
+              <Image
+                src={slide.image}
+                alt={slide.titleAccent}
+                fill
+                className="object-cover object-center opacity-70 scale-105"
+                priority={idx === 0}
+                unoptimized
+              />
+              <div className="absolute inset-0 bg-gradient-to-l from-black/60 to-transparent" />
+              <div className="absolute inset-0 w-full flex flex-col justify-center items-end text-right px-4 md:px-20 z-10 max-w-7xl mx-auto">
+                <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-1 md:mb-3">
+                  {slide.kicker}
+                </p>
+                <h1 className="text-white font-serif text-[28px] md:text-7xl mb-2 md:mb-4 leading-tight drop-shadow-2xl">
+                  {slide.titleTop} <br />
+                  <span className="italic text-[#d8e9ff]">{slide.titleAccent}</span>
+                </h1>
+                <p className="hidden md:block text-gray-300 max-w-md text-sm md:text-lg mb-6 leading-relaxed font-light">
+                  {slide.description}
+                </p>
+                <Link href={slide.href}>
+                  <button className="group flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-5 md:px-14 py-2 md:py-4 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-[var(--color-brand-primary-hover)] transition-all duration-500 shadow-2xl">
+                    {slide.cta} <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
+                  </button>
+                </Link>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setActiveHeroSlide((prev) => (prev - 1 + heroSlides.length) % heroSlides.length)}
+          className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/40 hover:bg-black/65 text-white items-center justify-center"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveHeroSlide((prev) => (prev + 1) % heroSlides.length)}
+          className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/40 hover:bg-black/65 text-white items-center justify-center"
+          aria-label="Next slide"
+        >
+          <ChevronRight size={20} />
+        </button>
+        <div className="absolute bottom-3 md:bottom-6 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2">
+          {heroSlides.map((slide, idx) => (
+            <button
+              key={`${slide.kicker}-dot`}
+              type="button"
+              onClick={() => setActiveHeroSlide(idx)}
+              className={`h-2 rounded-full transition-all ${
+                activeHeroSlide === idx ? 'w-8 bg-[var(--color-brand-primary)]' : 'w-2 bg-white/60'
+              }`}
+              aria-label={`Go to slide ${idx + 1}`}
+            />
+          ))}
         </div>
       </section>
 
