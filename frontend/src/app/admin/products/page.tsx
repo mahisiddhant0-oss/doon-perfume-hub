@@ -98,6 +98,14 @@ const normalizeCategoryLabel = (value = '') =>
     .trim()
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
+const normalizeCategoryNameKey = (value = '') =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\d+$/g, '')
+    .trim();
 
 export default function AdminProducts() {
   const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -154,6 +162,31 @@ export default function AdminProducts() {
     }
 
     return merged;
+  };
+
+  const resolveCanonicalCategoryValue = (rawValue: string, knownValues: string[]) => {
+    const value = String(rawValue || '').trim();
+    const normalized = value.toLowerCase();
+    if (!normalized) return '';
+
+    const known = knownValues.map((entry) => String(entry || '').trim()).filter(Boolean);
+    const knownLower = known.map((entry) => entry.toLowerCase());
+
+    const stripped = normalized.replace(/\d+$/g, '');
+    const strippedIndex = knownLower.findIndex((entry) => entry === stripped);
+    if (strippedIndex >= 0) {
+      return known[strippedIndex];
+    }
+
+    const rawLabel = categoryNamesByValue[normalized] || normalizeCategoryLabel(value);
+    const rawKey = normalizeCategoryNameKey(rawLabel);
+    const byName = known.find((candidate) => {
+      const candidateLabel = categoryNamesByValue[candidate.toLowerCase()] || normalizeCategoryLabel(candidate);
+      return normalizeCategoryNameKey(candidateLabel) === rawKey;
+    });
+    if (byName) return byName;
+
+    return value;
   };
 
   const fetchProducts = async () => {
@@ -248,9 +281,17 @@ export default function AdminProducts() {
       const normalizedCategories = Array.isArray(product.categories) && product.categories.length > 0
         ? product.categories.map((entry) => String(entry || '').trim()).filter(Boolean)
         : [String(product.category || '').trim()].filter(Boolean);
-      const sanitizedCategories = normalizedCategories.filter(
+      const knownValues = mergeCategoryValues(
+        CATEGORY_OPTIONS.map((option) => option.value),
+        customCategoryPool,
+        normalizedCategories
+      );
+      const sanitizedCategories = normalizedCategories
+        .map((entry) => resolveCanonicalCategoryValue(entry, knownValues))
+        .filter(
         (entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase())
       );
+      const dedupedCategories = mergeCategoryValues(sanitizedCategories);
 
       setEditingProduct(product);
       setFormData({
@@ -268,8 +309,8 @@ export default function AdminProducts() {
               image: String(variant.image || ''),
             }))
           : [],
-        category: sanitizedCategories[0] || 'perfumes',
-        categories: sanitizedCategories.length > 0 ? sanitizedCategories : ['perfumes'],
+        category: dedupedCategories[0] || 'perfumes',
+        categories: dedupedCategories.length > 0 ? dedupedCategories : ['perfumes'],
         description: product.description || '',
         images: product.images || []
       });
@@ -472,10 +513,26 @@ export default function AdminProducts() {
       .filter((category) => !EXCLUDED_CATEGORY_VALUES.has(category.toLowerCase()))
       .filter((category) => !defaultValues.has(category.toLowerCase()));
 
-    return mergeCategoryValues(categories, customCategoryPool)
-      .filter((category) => !defaultValues.has(category.toLowerCase()))
-      .sort((a, b) => a.localeCompare(b));
-  }, [products, customCategoryPool]);
+    const merged = mergeCategoryValues(categories, customCategoryPool).filter(
+      (category) => !defaultValues.has(category.toLowerCase())
+    );
+
+    const byName = new Map<string, string>();
+    merged.forEach((category) => {
+      const categoryLower = category.toLowerCase();
+      const displayName = categoryNamesByValue[categoryLower] || normalizeCategoryLabel(category);
+      const key = normalizeCategoryNameKey(displayName);
+      if (!byName.has(key)) {
+        byName.set(key, category);
+      }
+    });
+
+    return Array.from(byName.values()).sort((a, b) => {
+      const aLabel = categoryNamesByValue[a.toLowerCase()] || normalizeCategoryLabel(a);
+      const bLabel = categoryNamesByValue[b.toLowerCase()] || normalizeCategoryLabel(b);
+      return aLabel.localeCompare(bLabel);
+    });
+  }, [products, customCategoryPool, categoryNamesByValue]);
 
   const allCategoryOptions = useMemo(
     () =>
