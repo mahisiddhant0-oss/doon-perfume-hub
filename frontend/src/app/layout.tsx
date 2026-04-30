@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import Script from "next/script";
 import { Suspense } from "react";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import GoogleAnalytics from "@/components/GoogleAnalytics";
 
@@ -83,6 +84,7 @@ export default function RootLayout({
           </>
         ) : null}
         {children}
+        <Analytics />
       </body>
     </html>
   );
