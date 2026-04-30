@@ -35,6 +35,8 @@ type AdminProduct = {
   description?: string;
   images?: string[];
   isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 type VariantForm = {
@@ -122,7 +124,7 @@ export default function AdminProducts() {
   const [customCategoryPool, setCustomCategoryPool] = useState<string[]>([]);
   const [categoryNamesByValue, setCategoryNamesByValue] = useState<Record<string, string>>({});
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState<'default' | 'priceAsc' | 'priceDesc'>('default');
+  const [sortBy, setSortBy] = useState<'default' | 'latest' | 'priceAsc' | 'priceDesc'>('default');
   const [deletingCategoryValue, setDeletingCategoryValue] = useState('');
 
   const readStoredCustomCategories = () => {
@@ -468,6 +470,22 @@ export default function AdminProducts() {
     }));
   };
 
+  const getProductTimestamp = (product: AdminProduct) => {
+    const createdAt = Date.parse(String(product.createdAt || ''));
+    if (!Number.isNaN(createdAt)) return createdAt;
+
+    const updatedAt = Date.parse(String(product.updatedAt || ''));
+    if (!Number.isNaN(updatedAt)) return updatedAt;
+
+    // MongoDB ObjectId embeds creation time in its first 4 bytes (8 hex chars).
+    const idPrefix = String(product._id || '').slice(0, 8);
+    if (/^[0-9a-fA-F]{8}$/.test(idPrefix)) {
+      return parseInt(idPrefix, 16) * 1000;
+    }
+
+    return 0;
+  };
+
   const visibleProducts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     const categoryTagQuery = query.startsWith('#') ? query.slice(1).trim() : '';
@@ -494,7 +512,9 @@ export default function AdminProducts() {
       });
     }
 
-    if (sortBy === 'priceAsc') {
+    if (sortBy === 'latest') {
+      result.sort((a, b) => getProductTimestamp(b) - getProductTimestamp(a));
+    } else if (sortBy === 'priceAsc') {
       result.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
     } else if (sortBy === 'priceDesc') {
       result.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
@@ -700,10 +720,11 @@ export default function AdminProducts() {
           </div>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as 'default' | 'priceAsc' | 'priceDesc')}
+            onChange={(e) => setSortBy(e.target.value as 'default' | 'latest' | 'priceAsc' | 'priceDesc')}
             className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl px-4 py-3 text-sm text-[#ccc] focus:outline-none focus:border-[#D4AF37] transition-all min-w-[210px]"
           >
             <option value="default">Sort: Default</option>
+            <option value="latest">Sort: Latest</option>
             <option value="priceAsc">Sort: Price Low to High</option>
             <option value="priceDesc">Sort: Price High to Low</option>
           </select>
