@@ -77,48 +77,9 @@ const trackOrder = async (req, res) => {
  */
 const syncDeliveredOrders = async (req, res) => {
   try {
-    const pendingAwbOrders = await Order.find({
-      paymentStatus: 'paid',
-      orderStatus: { $in: ['processing', 'pending'] },
-      $or: [{ awbNumber: { $exists: false } }, { awbNumber: '' }, { awbNumber: null }],
-    });
-
-    let awbGeneratedCount = 0;
-    let pickupScheduledCount = 0;
-    let awbGenerationFailedCount = 0;
-
-    for (const order of pendingAwbOrders) {
-      try {
-        const shipmentResult = await createShipment(order);
-        if (shipmentResult?.awbNumber) {
-          order.awbNumber = shipmentResult.awbNumber;
-          order.orderStatus = 'shipped';
-          order.logisticsStatus = 'in_transit';
-          await order.save();
-          awbGeneratedCount += 1;
-
-          const pickupResult = await schedulePickup(order);
-          if (!pickupResult?.error) {
-            pickupScheduledCount += 1;
-          }
-
-          try {
-            const user = await User.findById(order.user).select('email');
-            if (user?.email) {
-              await sendOrderConfirmation(order, user.email);
-            }
-            await sendAdminNewOrderAlert(order);
-          } catch (emailError) {
-            console.error(`AWB email update failed for ${order._id}:`, emailError.message);
-          }
-        } else {
-          awbGenerationFailedCount += 1;
-        }
-      } catch (awbError) {
-        awbGenerationFailedCount += 1;
-        console.error(`AWB generation failed for ${order._id}:`, awbError.message);
-      }
-    }
+    const awbGeneratedCount = 0;
+    const pickupScheduledCount = 0;
+    const awbGenerationFailedCount = 0;
 
     const candidateOrders = await Order.find({
       paymentStatus: 'paid',

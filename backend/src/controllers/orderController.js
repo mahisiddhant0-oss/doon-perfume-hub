@@ -6,7 +6,6 @@ const Cart = require('../models/Cart');
 const Product = require('../models/Product');
 const User = require('../models/User');
 const razorpayInstance = require('../config/razorpay');
-const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
 
 const GST_RATE = 0.18;
@@ -123,20 +122,6 @@ const settlePaidOrder = async ({ payment, order, customerEmail, clearCartUserId 
 
     if (clearCartUserId) {
       await Cart.findOneAndUpdate({ user: clearCartUserId }, { items: [] });
-    }
-
-    try {
-      const shipmentResult = await createShipment(order);
-      if (shipmentResult?.awbNumber) {
-        order.awbNumber = shipmentResult.awbNumber;
-        order.orderStatus = 'shipped';
-        order.logisticsStatus = 'in_transit';
-        await order.save();
-
-        await schedulePickup(order);
-      }
-    } catch (logisticsError) {
-      console.error('Delhivery AWB generation failed:', logisticsError.message);
     }
 
     try {
@@ -608,19 +593,6 @@ const createCustomOrder = async (req, res) => {
       status: 'captured',
       paymentMethod: paymentMethod || 'manual',
     });
-
-    try {
-      const shipmentResult = await createShipment(order);
-      if (shipmentResult?.awbNumber) {
-        order.awbNumber = shipmentResult.awbNumber;
-        order.orderStatus = 'shipped';
-        order.logisticsStatus = 'in_transit';
-        await order.save();
-        await schedulePickup(order);
-      }
-    } catch (logisticsError) {
-      console.error('Custom order logistics error:', logisticsError.message);
-    }
 
     return res.status(201).json(order);
   } catch (error) {

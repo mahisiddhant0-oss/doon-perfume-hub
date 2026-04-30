@@ -1,7 +1,6 @@
 const crypto = require('crypto');
 const Order = require('../models/Order');
 const Payment = require('../models/Payment');
-const { createShipment, schedulePickup } = require('../services/delhiveryService');
 const { sendOrderConfirmation, sendAdminNewOrderAlert } = require('../services/emailService');
 const Product = require('../models/Product');
 const Cart = require('../models/Cart');
@@ -88,20 +87,10 @@ const handleRazorpayWebhook = async (req, res) => {
         await Cart.findOneAndUpdate({ user: order.user }, { items: [] });
 
         try {
-          const shipmentResult = await createShipment(order);
-          if (shipmentResult?.awbNumber) {
-            order.awbNumber = shipmentResult.awbNumber;
-            order.orderStatus = 'shipped';
-            order.logisticsStatus = 'in_transit';
-            await order.save();
-
-            await schedulePickup(order);
-          }
-
           await sendOrderConfirmation(order, order.user.email);
           await sendAdminNewOrderAlert(order);
-        } catch (logisticsError) {
-          console.error('Logistics API failed during webhook processing:', logisticsError.message);
+        } catch (emailError) {
+          console.error('Order email notification failed during webhook processing:', emailError.message);
         }
       }
     } catch (error) {
