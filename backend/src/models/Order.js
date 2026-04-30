@@ -102,10 +102,18 @@ orderSchema.pre('validate', async function () {
     return;
   }
 
+  // Ensure counter exists first, then increment in a separate atomic op.
+  // This avoids MongoDB path conflicts from updating `seq` via multiple operators at once.
+  await Counter.updateOne(
+    { key: 'order' },
+    { $setOnInsert: { key: 'order', seq: 1000 } },
+    { upsert: true }
+  );
+
   const counter = await Counter.findOneAndUpdate(
     { key: 'order' },
-    { $setOnInsert: { key: 'order', seq: 1000 }, $inc: { seq: 1 } },
-    { upsert: true, new: true }
+    { $inc: { seq: 1 } },
+    { new: true }
   );
 
   this.orderCode = `DPH#${counter.seq}`;
