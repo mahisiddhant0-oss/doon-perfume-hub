@@ -366,18 +366,15 @@ export default function Home() {
                     <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.2em] text-[8px] md:text-xs mb-1 md:mb-2">
                       ESSENTIAL OIL COLLECTION
                     </p>
-                    <h1 className="text-white font-serif text-[22px] sm:text-[28px] md:text-6xl mb-2 md:mb-3 leading-[1.05] drop-shadow-2xl max-w-[760px]">
+                    <h1 className="text-white font-serif text-[22px] sm:text-[28px] md:text-6xl mb-3 md:mb-4 leading-[1.05] drop-shadow-2xl max-w-[760px]">
                       Pure Power Of <br />
                       <span className="italic text-[#d8e9ff]">Givaudan Oils</span>
                     </h1>
-                    <p className="text-gray-200 max-w-[620px] text-[12px] sm:text-sm md:text-xl mb-4 md:mb-6 leading-relaxed font-light">
-                      Crafted with premium Givaudan essential oils, each drop is made to uplift your day, spark confidence, and leave a lasting impression wherever you go.
-                    </p>
                   </div>
                   <Link
                     href={slide.href}
                     aria-label="Explore now"
-                    className="pointer-events-auto absolute left-4 bottom-4 md:left-16 md:bottom-[12%]"
+                    className="pointer-events-auto absolute left-4 top-[68%] md:left-16 md:top-auto md:bottom-[12%]"
                   >
                     <button className="group flex items-center gap-2 md:gap-3 border border-[#a97a3d] text-[#d2a767] bg-black/25 backdrop-blur-sm px-3 md:px-7 py-1.5 md:py-2.5 text-[9px] md:text-xs tracking-[0.16em] font-bold hover:bg-black/45 transition-all duration-300 shadow-xl">
                       EXPLORE NOW <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
