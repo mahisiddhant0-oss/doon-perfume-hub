@@ -507,18 +507,11 @@ function ProductsPageContent() {
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {products.map((product) => {
                   const isOutOfStock = getIsProductOutOfStock(product);
-                  const CardWrapper = isOutOfStock ? "div" : Link;
-                  const cardProps = isOutOfStock
-                    ? {}
-                    : { href: `/products/${product._id}` };
-                  return (
-                  <CardWrapper
-                    {...cardProps}
-                    key={product._id}
-                    className={`group flex flex-col bg-white overflow-hidden shadow-sm transition-shadow ${
-                      isOutOfStock ? "opacity-95 cursor-not-allowed" : "hover:shadow-md"
-                    }`}
-                  >
+                  const cardClassName = `group flex flex-col bg-white overflow-hidden shadow-sm transition-shadow ${
+                    isOutOfStock ? "opacity-95 cursor-not-allowed" : "hover:shadow-md"
+                  }`;
+                  const cardContent = (
+                    <>
                     <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
                       <Image
                         src={getProductImage(product)}
@@ -563,8 +556,23 @@ function ProductsPageContent() {
                         )}
                       </div>
                     </div>
-                  </CardWrapper>
-                )})}
+                    </>
+                  );
+
+                  if (isOutOfStock) {
+                    return (
+                      <div key={product._id} className={cardClassName}>
+                        {cardContent}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <Link key={product._id} href={`/products/${product._id}`} className={cardClassName}>
+                      {cardContent}
+                    </Link>
+                  );
+                })}
               </div>
             </>
           )}
