@@ -2,6 +2,7 @@ const Product = require('../models/Product');
 const ProductCategory = require('../models/ProductCategory');
 const Enquiry = require('../models/Enquiry');
 const { syncProductImagesFromWix } = require('../services/wixImageSyncService');
+const { ensureEssentialOil100mlVariants } = require('../services/essentialOilVariantService');
 const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
 const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
@@ -523,6 +524,24 @@ const syncWixImages = async (req, res) => {
   }
 };
 
+// @desc    Force-sync 100ml variants for essential-oils products
+// @route   POST /api/products/admin/sync-essential-oils-100ml
+// @access  Private/Admin
+const syncEssentialOil100mlVariants = async (req, res) => {
+  try {
+    const result = await ensureEssentialOil100mlVariants();
+    return res.status(200).json({
+      message: 'Essential-oil 100ml variant sync completed',
+      ...result,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Essential-oil 100ml variant sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -536,4 +555,5 @@ module.exports = {
   deleteProduct,
   submitProductEnquiry,
   syncWixImages,
+  syncEssentialOil100mlVariants,
 };

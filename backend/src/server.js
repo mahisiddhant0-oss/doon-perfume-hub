@@ -9,6 +9,7 @@ const { getAllowedOrigins, getPrimaryFrontendUrl, isOriginAllowed, isProduction,
 const Order = require('./models/Order');
 const Counter = require('./models/Counter');
 const { upsertSpecialEnquiryProducts } = require('./services/specialEnquiryProducts');
+const { ensureEssentialOil100mlVariants } = require('./services/essentialOilVariantService');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -154,9 +155,22 @@ const seedSpecialEnquiryCatalog = async () => {
   }
 };
 
+const syncEssentialOilVariants = async () => {
+  try {
+    if (mongoose.connection?.readyState !== 1) return;
+    const result = await ensureEssentialOil100mlVariants();
+    console.log(
+      `Essential-oil 100ml sync completed. Updated ${result.updatedProducts} of ${result.essentialOilProducts} products`
+    );
+  } catch (error) {
+    console.error('Essential-oil 100ml sync failed:', error.message);
+  }
+};
+
 setTimeout(() => {
   reconcileOrderCodes();
   seedSpecialEnquiryCatalog();
+  syncEssentialOilVariants();
 }, 5000);
 
 app.use('/api/auth', authRoutes);
