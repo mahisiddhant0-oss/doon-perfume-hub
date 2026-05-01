@@ -209,8 +209,7 @@ const SPECIAL_ROWS = [
 
 const toSku = (firstColumn, weightKg) => `GIVEX${Number(weightKg)}KG${String(firstColumn || '').trim()}`;
 const toName = (firstColumn, secondColumn, weightKg) => {
-  const useFirstColumnForName = Number(weightKg) === 25;
-  const baseName = useFirstColumnForName ? firstColumn : secondColumn;
+  const baseName = secondColumn;
   return `${String(baseName || '').trim()} ${Number(weightKg)} KG ESSENTIAL OIL`;
 };
 
