@@ -12,6 +12,7 @@ const {
   updateProduct,
   deleteProduct,
   submitProductEnquiry,
+  syncWixImages,
 } = require('../controllers/productController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { productValidation } = require('../middlewares/validationMiddleware');
@@ -28,6 +29,7 @@ router.route('/categories').post(protect, adminRights, createProductCategory);
 router.route('/categories/:id').put(protect, adminRights, updateProductCategory);
 router.route('/categories/:id').delete(protect, adminRights, deleteProductCategory);
 router.route('/').post(protect, adminRights, productValidation, createProduct);
+router.route('/admin/sync-wix-images').post(protect, adminRights, syncWixImages);
 router.route('/:id').put(protect, adminRights, productValidation, updateProduct);
 router.route('/:id').delete(protect, adminRights, deleteProduct);
 

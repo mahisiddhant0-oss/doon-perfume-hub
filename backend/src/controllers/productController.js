@@ -1,6 +1,7 @@
 const Product = require('../models/Product');
 const ProductCategory = require('../models/ProductCategory');
 const Enquiry = require('../models/Enquiry');
+const { syncProductImagesFromWix } = require('../services/wixImageSyncService');
 const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
 const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
@@ -504,6 +505,24 @@ const submitProductEnquiry = async (req, res) => {
   }
 };
 
+// @desc    Sync product images from Wix media folder
+// @route   POST /api/products/admin/sync-wix-images
+// @access  Private/Admin
+const syncWixImages = async (req, res) => {
+  try {
+    const folder = String(req.body?.folder || '').trim() || process.env.WIX_MEDIA_FOLDER || '';
+    const matchBy = String(req.body?.matchBy || 'name').toLowerCase() === 'sku' ? 'sku' : 'name';
+
+    const result = await syncProductImagesFromWix({ folder, matchBy });
+    return res.status(200).json({
+      message: 'Wix image sync completed',
+      ...result,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Wix image sync failed', error: error.message });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -516,4 +535,5 @@ module.exports = {
   updateProduct,
   deleteProduct,
   submitProductEnquiry,
+  syncWixImages,
 };
