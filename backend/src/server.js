@@ -17,6 +17,7 @@ const cartRoutes = require('./routes/cartRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const logisticsRoutes = require('./routes/logisticsRoutes');
 const webhookRoutes = require('./routes/webhookRoutes');
+const enquiryRoutes = require('./routes/enquiryRoutes');
 const { notFound, errorHandler } = require('./middlewares/errorMiddleware');
 
 validateEnv();
@@ -163,6 +164,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/logistics', logisticsRoutes);
+app.use('/api/enquiries', enquiryRoutes);
 
 app.get('/', (req, res) => {
   res.send('API is running...');

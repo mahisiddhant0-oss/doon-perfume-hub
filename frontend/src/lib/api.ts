@@ -20,6 +20,7 @@ export const API_ROUTES = {
   CART: `${API_BASE}/api/cart`,
   ORDERS: `${API_BASE}/api/orders`,
   LOGISTICS: `${API_BASE}/api/logistics`,
+  ENQUIRIES: `${API_BASE}/api/enquiries`,
   WEBHOOKS: `${API_BASE}/api/webhooks`,
 };
 

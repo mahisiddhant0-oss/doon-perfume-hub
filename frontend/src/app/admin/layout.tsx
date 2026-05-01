@@ -10,6 +10,7 @@ import {
   ShoppingBag, 
   Users, 
   Grid3X3,
+  MessageSquareMore,
   LogOut, 
   Menu, 
   X,
@@ -133,6 +134,7 @@ export default function AdminLayout({
     { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
     { name: 'Users', href: '/admin/users', icon: Users },
     { name: 'Manage Categories', href: '/admin/categories', icon: Grid3X3 },
+    { name: 'Enquiries', href: '/admin/enquiries', icon: MessageSquareMore },
   ];
 
   const activeNavItem =
