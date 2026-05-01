@@ -39,6 +39,152 @@ interface Product {
   stock: number;
 }
 
+const getDeterministicPrice700To800 = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash = (hash * 31 + seed.charCodeAt(i)) % 101;
+  }
+  return 700 + hash;
+};
+
+const matchesOilPackSize = (name: string, kg: number) => {
+  const escapedKg = String(kg).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`\\b${escapedKg}\\s*kg\\s+essential\\s+oil\\b`, "i");
+  return pattern.test(name);
+};
+
+const isEnquiryVariantForProduct = (product: Product, variantLabel?: string) => {
+  const normalizedLabel = String(variantLabel || "").trim().toLowerCase();
+  if (matchesOilPackSize(product.name, 25)) return normalizedLabel === "25kg";
+  if (matchesOilPackSize(product.name, 5)) return normalizedLabel === "5kg";
+  return Boolean(product.enquiryOnly);
+};
+
+const withSpecialVariantsForFiveKgOil = (product: Product): Product => {
+  const isTwentyFiveKgEssentialOilProduct = matchesOilPackSize(product.name, 25);
+  if (isTwentyFiveKgEssentialOilProduct) {
+    const existingVariants = Array.isArray(product.variants) ? product.variants : [];
+    const baseVariant = existingVariants[0];
+    const fallbackImage = baseVariant?.image?.trim() || product.images?.[0] || "";
+    const fallbackStock = Number(baseVariant?.stock ?? product.stock ?? 1);
+    const random100MlPrice = getDeterministicPrice700To800(`${product._id}-${product.name}`);
+
+    const normalizedVariants = existingVariants
+      .filter((variant) => {
+        const label = String(variant.label || "").trim().toLowerCase();
+        return label !== "5kg";
+      })
+      .map((variant) => {
+        const label = String(variant.label || "").trim().toLowerCase();
+        if (label === "100ml") {
+          return {
+            ...variant,
+            price: random100MlPrice,
+            weight: 1,
+          };
+        }
+        if (label === "25kg") {
+          return {
+            ...variant,
+            weight: 25,
+          };
+        }
+        return variant;
+      });
+
+    const has25KgVariant = normalizedVariants.some(
+      (variant) => String(variant.label || "").trim().toLowerCase() === "25kg"
+    );
+    const has100MlVariant = normalizedVariants.some(
+      (variant) => String(variant.label || "").trim().toLowerCase() === "100ml"
+    );
+
+    if (!has100MlVariant) {
+      normalizedVariants.push({
+        label: "100ml",
+        price: random100MlPrice,
+        stock: fallbackStock,
+        weight: 1,
+        image: fallbackImage,
+      });
+    }
+
+    if (!has25KgVariant) {
+      normalizedVariants.push({
+        label: "25kg",
+        price: Number(baseVariant?.price ?? product.price ?? 0),
+        stock: fallbackStock,
+        weight: 25,
+        image: fallbackImage,
+      });
+    }
+
+    return {
+      ...product,
+      variants: normalizedVariants,
+    };
+  }
+
+  const isFiveKgEssentialOilProduct = matchesOilPackSize(product.name, 5);
+  if (!isFiveKgEssentialOilProduct) return product;
+
+  const existingVariants = Array.isArray(product.variants) ? product.variants : [];
+  const baseVariant = existingVariants[0];
+  const fallbackImage = baseVariant?.image?.trim() || product.images?.[0] || "";
+  const fallbackStock = Number(baseVariant?.stock ?? product.stock ?? 1);
+  const random100MlPrice = getDeterministicPrice700To800(`${product._id}-${product.name}`);
+
+  const hasFiveKgVariant = existingVariants.some(
+    (variant) => String(variant.label || "").trim().toLowerCase() === "5kg"
+  );
+  const has100MlVariant = existingVariants.some(
+    (variant) => String(variant.label || "").trim().toLowerCase() === "100ml"
+  );
+
+  const normalizedVariants = existingVariants.map((variant) => {
+    const label = String(variant.label || "").trim().toLowerCase();
+    if (label === "100ml") {
+      return {
+        ...variant,
+        price: random100MlPrice,
+        weight: 1,
+      };
+    }
+    if (label === "5kg") {
+      return {
+        ...variant,
+        weight: 5,
+      };
+    }
+    return variant;
+  });
+
+  if (!has100MlVariant) {
+    normalizedVariants.push({
+      label: "100ml",
+      price: random100MlPrice,
+      stock: fallbackStock,
+      weight: 1,
+      image: fallbackImage,
+    });
+  }
+
+  if (!hasFiveKgVariant) {
+    normalizedVariants.push({
+      label: "5kg",
+      price: Number(baseVariant?.price ?? product.price ?? 0),
+      stock: fallbackStock,
+      weight: 5,
+      image: fallbackImage,
+    });
+  }
+
+  return {
+    ...product,
+    variants: normalizedVariants,
+  };
+};
+
 interface CartItem {
   id: string;
   name: string;
@@ -111,13 +257,17 @@ export default function ProductDetails() {
         const res = await fetch(`${API_ROUTES.PRODUCTS}/${productId}`);
         if (!res.ok) throw new Error("Product not found");
         const data: Product = await res.json();
-        setProduct(data);
-        const fallbackImage = data.images?.[0] || DEFAULT_IMAGE;
+        const productWithVariants = withSpecialVariantsForFiveKgOil(data);
+        setProduct(productWithVariants);
+        const fallbackImage = productWithVariants.images?.[0] || DEFAULT_IMAGE;
         setMainImage(fallbackImage);
-        if (data.variants?.length > 0) {
-          const firstVariant = data.variants[0];
-          setSelectedVariant(firstVariant);
-          setMainImage(firstVariant.image?.trim() || fallbackImage);
+        if (productWithVariants.variants?.length > 0) {
+          const preferredVariant =
+            productWithVariants.variants.find(
+              (variant) => String(variant.label || "").trim().toLowerCase() === "100ml"
+            ) || productWithVariants.variants[0];
+          setSelectedVariant(preferredVariant);
+          setMainImage(preferredVariant.image?.trim() || fallbackImage);
         }
       } catch (err: any) {
         setError(err?.message || "Failed to load product");
@@ -131,7 +281,7 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    if (product.enquiryOnly) return;
+    if (isEnquiryVariantForProduct(product, selectedVariant?.label)) return;
     const isOutOfStock = selectedVariant
       ? Number(selectedVariant.stock || 0) <= 0
       : getIsProductOutOfStock(product);
@@ -206,7 +356,7 @@ export default function ProductDetails() {
   }
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-  const isEnquiryOnly = Boolean(product.enquiryOnly);
+  const isEnquiryOnly = isEnquiryVariantForProduct(product, selectedVariant?.label);
   const isOutOfStock = selectedVariant
     ? Number(selectedVariant.stock || 0) <= 0
     : getIsProductOutOfStock(product);

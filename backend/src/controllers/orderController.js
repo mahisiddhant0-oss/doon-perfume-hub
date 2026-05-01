@@ -22,10 +22,6 @@ const calculateBilling = (items = [], productMap = new Map()) => {
     if (!product) {
       throw new Error(`Product not found for checkout item: ${productId}`);
     }
-    if (product.enquiryOnly) {
-      throw new Error(`${product.name} is available only for price enquiry and cannot be checked out.`);
-    }
-
     const selectedSize = typeof item.size === 'string' ? item.size.trim() : '';
     const matchedVariant = selectedSize
       ? (product.variants || []).find((variant) => variant.label === selectedSize)
@@ -33,6 +29,9 @@ const calculateBilling = (items = [], productMap = new Map()) => {
 
     if (selectedSize && !matchedVariant) {
       throw new Error(`Selected size "${selectedSize}" is unavailable for ${product.name}`);
+    }
+    if (isEnquiryVariantForProduct(product, selectedSize)) {
+      throw new Error(`${product.name} is available only for price enquiry and cannot be checked out.`);
     }
 
     const quantity = Number(item.quantity) || 0;
@@ -85,6 +84,19 @@ const buildReceiptId = (userId) => {
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 const normalizePhone = (phone = '') => String(phone).replace(/[^\d+]/g, '');
 const normalizeSku = (value = '') => String(value || '').trim().toUpperCase();
+const matchesOilPackSize = (name = '', kg) => {
+  const escapedKg = String(kg).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`\\b${escapedKg}\\s*kg\\s+essential\\s+oil\\b`, 'i');
+  return pattern.test(String(name || ''));
+};
+const isEnquiryVariantForProduct = (product = {}, selectedSize = '') => {
+  const normalizedSize = String(selectedSize || '').trim().toLowerCase();
+  const name = String(product?.name || '');
+
+  if (matchesOilPackSize(name, 25)) return normalizedSize !== '100ml';
+  if (matchesOilPackSize(name, 5)) return normalizedSize !== '100ml';
+  return Boolean(product?.enquiryOnly);
+};
 const getCheckoutItemProductId = (item = {}) =>
   String(item?.id || item?.product || item?._id || item?.productId || '').trim();
 const extractErrorMessage = (error) =>

@@ -209,23 +209,53 @@ const SPECIAL_ROWS = [
 
 const toSku = (firstColumn, weightKg) => `GIVEX${Number(weightKg)}KG${String(firstColumn || '').trim()}`;
 const toName = (firstColumn, secondColumn, weightKg) => {
-  const baseName = secondColumn;
+  const baseName = firstColumn;
   return `${String(baseName || '').trim()} ${Number(weightKg)} KG ESSENTIAL OIL`;
 };
+const getDeterministicPrice700To800 = (seed = '') => {
+  let hash = 0;
+  for (let i = 0; i < String(seed).length; i += 1) {
+    hash = (hash * 31 + String(seed).charCodeAt(i)) % 101;
+  }
+  return 700 + hash;
+};
 
-const buildSpecialPayload = (firstColumn, secondColumn, weightKg) => ({
-  name: toName(firstColumn, secondColumn, weightKg),
-  sku: toSku(firstColumn, weightKg),
-  description: 'Price on enquiry. Click GET BEST PRICE to request a callback.',
-  price: 0,
-  enquiryOnly: true,
-  stock: 0,
-  weightKg: Number(weightKg),
-  category: 'essential-oils',
-  categories: ['essential-oils', 'all'],
-  images: [],
-  isActive: true,
-});
+const buildSpecialPayload = (firstColumn, secondColumn, weightKg) => {
+  const numericWeight = Number(weightKg);
+  const sku = toSku(firstColumn, numericWeight);
+  const name = toName(firstColumn, secondColumn, numericWeight);
+  const price100ml = getDeterministicPrice700To800(`${sku}-${name}`);
+
+  return {
+    name,
+    sku,
+    description: 'Price on enquiry. Click GET BEST PRICE to request a callback.',
+    price: 0,
+    enquiryOnly: true,
+    stock: 0,
+    weightKg: numericWeight,
+    category: 'essential-oils',
+    categories: ['essential-oils', 'all'],
+    images: [],
+    variants: [
+      {
+        label: '100ml',
+        price: price100ml,
+        stock: 50,
+        weight: 1,
+        image: '',
+      },
+      {
+        label: `${numericWeight}kg`,
+        price: 0,
+        stock: 0,
+        weight: numericWeight,
+        image: '',
+      },
+    ],
+    isActive: true,
+  };
+};
 
 const upsertSpecialEnquiryProducts = async () => {
   let created = 0;
