@@ -565,25 +565,25 @@ export default function Home() {
       </section>
 
       {/* Latest Products Section */}
-      <section className="py-20 md:py-32 max-w-7xl mx-auto px-4 md:px-8">
-        <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-4">
+      <section className="py-12 md:py-32 max-w-7xl mx-auto px-4 md:px-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-16 gap-4">
             <div className="max-w-xl text-left">
-                <h2 className="text-4xl md:text-6xl font-serif text-[var(--color-brand-text)] mb-4">Latest Viral <br /><span className="italic text-[var(--color-brand-primary)]">Launches</span></h2>
+                <h2 className="text-3xl md:text-6xl font-serif text-[var(--color-brand-text)] mb-3">Latest Viral <br /><span className="italic text-[var(--color-brand-primary)]">Launches</span></h2>
                 <p className="text-gray-500 text-sm md:text-base leading-relaxed font-light">The most loved scents of the season, now restocked and ready for you.</p>
             </div>
-            <Link href="/products" className="text-xs font-bold tracking-widest text-black border-b-2 border-black pb-1 hover:text-[var(--color-brand-primary)] hover:border-[var(--color-brand-primary)] transition-all">
+            <Link href="/products" className="text-xs font-bold tracking-widest text-black border-b-2 border-black pb-1 hover:text-[var(--color-brand-primary)] hover:border-[var(--color-brand-primary)] transition-all self-start md:self-auto">
                 VIEW ALL FRAGRANCES
             </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
           {loading ? (
             [...Array(4)].map((_, i) => (
-                <div key={i} className="animate-pulse bg-gray-50 aspect-square rounded-lg" />
+                <div key={i} className="animate-pulse bg-gray-50 aspect-[3/4] rounded-lg" />
             ))
           ) : viralLaunches.map((item) => (
             <Link href={`/products/${item._id}`} key={item._id} className="group flex flex-col items-center">
-              <div className="bg-white overflow-hidden mb-6 shadow-sm group-hover:shadow-xl transition-all duration-700 relative aspect-[4/5] w-full">
+              <div className="bg-white overflow-hidden mb-3 md:mb-6 shadow-sm group-hover:shadow-xl transition-all duration-700 relative aspect-[3/4] md:aspect-[4/5] w-full">
                  <Image 
                     src={item.images?.[0] || DEFAULT_IMAGE} 
                     alt={item.name} 
@@ -595,12 +595,12 @@ export default function Home() {
                     <button className="w-full bg-white text-black py-3 text-[10px] font-bold tracking-widest uppercase">Quick View</button>
                  </div>
               </div>
-              <div className="text-center space-y-2">
-                <p className="text-[10px] tracking-[0.3em] font-bold text-[var(--color-brand-primary)] uppercase">
+              <div className="text-center space-y-1 md:space-y-2">
+                <p className="text-[9px] md:text-[10px] tracking-[0.22em] md:tracking-[0.3em] font-bold text-[var(--color-brand-primary)] uppercase">
                   {getPrimaryCategory(item).replace('-', ' ')}
                 </p>
-                <h3 className="font-serif text-2xl text-gray-800">{item.name}</h3>
-                <div className="flex items-center justify-center gap-1 text-gray-400">
+                <h3 className="font-serif text-base md:text-2xl text-gray-800 leading-snug line-clamp-2">{item.name}</h3>
+                <div className="hidden md:flex items-center justify-center gap-1 text-gray-400">
                     <Star size={10} fill="currentColor" />
                     <Star size={10} fill="currentColor" />
                     <Star size={10} fill="currentColor" />
