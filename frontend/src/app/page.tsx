@@ -26,9 +26,11 @@ type CategoryMeta = {
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
-const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
+const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['general']);
+const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles'];
 const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const CATEGORY_ICON_MAP: Record<string, string> = {
+  all: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   general: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   perfumes: 'https://cdn-icons-png.flaticon.com/512/1005/1005141.png',
   'essential-oils': 'https://cdn-icons-png.flaticon.com/512/2169/2169864.png',
@@ -138,7 +140,7 @@ export default function Home() {
     for (const product of allProducts) {
       for (const categoryValue of getProductCategories(product)) {
         const normalized = categoryValue.toLowerCase();
-        if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
+        if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(normalized)) continue;
         if (!map.has(normalized)) {
           const meta = categoryMetaMap[normalized];
           map.set(normalized, {
@@ -153,7 +155,7 @@ export default function Home() {
 
     for (const categoryValue of [...backendCategories, ...storedCustomCategories]) {
       const normalized = String(categoryValue || '').trim().toLowerCase();
-      if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized)) continue;
+      if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(normalized)) continue;
       if (!map.has(normalized)) {
         const meta = categoryMetaMap[normalized];
         map.set(normalized, {
@@ -166,7 +168,7 @@ export default function Home() {
     }
 
     return [
-      { name: 'All', icon: CATEGORY_ICON_MAP.general, slug: '', hasCustomImage: false },
+      { name: 'All', icon: CATEGORY_ICON_MAP.all, slug: '', hasCustomImage: false },
       ...Array.from(map.values()),
     ];
   }, [allProducts, backendCategories, storedCustomCategories, categoryMetaMap]);
@@ -276,13 +278,13 @@ export default function Home() {
         const normalized = entries
           .map((entry) => (typeof entry === 'string' ? entry : String(entry?.value || '')))
           .map((entry) => String(entry || '').trim().toLowerCase())
-          .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry));
+          .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry) && !HIDDEN_FRONTEND_CATEGORY_VALUES.has(entry));
         setBackendCategories(Array.from(new Set(normalized)));
         const metaMap: Record<string, CategoryMeta> = {};
         entries.forEach((entry) => {
           if (!entry || typeof entry === 'string') return;
           const value = String(entry.value || '').trim().toLowerCase();
-          if (!value || EXCLUDED_CATEGORY_VALUES.has(value)) return;
+          if (!value || EXCLUDED_CATEGORY_VALUES.has(value) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(value)) return;
           metaMap[value] = {
             _id: entry._id,
             value,
