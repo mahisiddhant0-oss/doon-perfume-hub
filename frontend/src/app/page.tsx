@@ -26,7 +26,7 @@ type CategoryMeta = {
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
-const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['general']);
+const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['general', 'all']);
 const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles'];
 const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const CATEGORY_ICON_MAP: Record<string, string> = {
