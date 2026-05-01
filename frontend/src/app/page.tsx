@@ -362,24 +362,24 @@ export default function Home() {
               {idx === 0 ? (
                 <div className="absolute inset-0 z-10 pointer-events-none">
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/70 via-black/30 to-transparent" />
-                  <div className="pointer-events-none absolute inset-0 w-full flex flex-col justify-center items-start px-4 md:px-20 z-10 max-w-7xl mx-auto">
-                    <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.24em] text-[9px] md:text-sm mb-2 md:mb-3">
+                  <div className="pointer-events-none absolute inset-0 w-full flex flex-col justify-center items-start px-4 md:px-16 z-10 max-w-6xl mx-auto">
+                    <p className="text-[var(--color-brand-primary)] font-bold tracking-[0.2em] text-[8px] md:text-xs mb-1 md:mb-2">
                       ESSENTIAL OIL COLLECTION
                     </p>
-                    <h1 className="text-white font-serif text-[30px] md:text-7xl mb-2 md:mb-4 leading-tight drop-shadow-2xl">
+                    <h1 className="text-white font-serif text-[22px] sm:text-[28px] md:text-6xl mb-2 md:mb-3 leading-[1.05] drop-shadow-2xl max-w-[760px]">
                       Pure Power Of <br />
                       <span className="italic text-[#d8e9ff]">Givaudan Oils</span>
                     </h1>
-                    <p className="hidden md:block text-gray-200 max-w-2xl text-sm md:text-2xl mb-6 leading-relaxed font-light">
+                    <p className="text-gray-200 max-w-[620px] text-[12px] sm:text-sm md:text-xl mb-4 md:mb-6 leading-relaxed font-light">
                       Crafted with premium Givaudan essential oils, each drop is made to uplift your day, spark confidence, and leave a lasting impression wherever you go.
                     </p>
                   </div>
                   <Link
                     href={slide.href}
                     aria-label="Explore now"
-                    className="pointer-events-auto absolute left-4 bottom-4 md:left-20 md:bottom-[14%]"
+                    className="pointer-events-auto absolute left-4 bottom-4 md:left-16 md:bottom-[12%]"
                   >
-                    <button className="group flex items-center gap-3 border border-[#a97a3d] text-[#d2a767] bg-black/25 backdrop-blur-sm px-4 md:px-8 py-2 md:py-3 text-[10px] md:text-sm tracking-[0.16em] font-bold hover:bg-black/45 transition-all duration-300 shadow-xl">
+                    <button className="group flex items-center gap-2 md:gap-3 border border-[#a97a3d] text-[#d2a767] bg-black/25 backdrop-blur-sm px-3 md:px-7 py-1.5 md:py-2.5 text-[9px] md:text-xs tracking-[0.16em] font-bold hover:bg-black/45 transition-all duration-300 shadow-xl">
                       EXPLORE NOW <ArrowRight size={18} className="group-hover:translate-x-2 transition-transform" />
                     </button>
                   </Link>
