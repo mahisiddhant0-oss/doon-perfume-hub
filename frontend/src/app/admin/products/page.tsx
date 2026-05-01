@@ -126,6 +126,8 @@ export default function AdminProducts() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'default' | 'latest' | 'priceAsc' | 'priceDesc'>('default');
   const [deletingCategoryValue, setDeletingCategoryValue] = useState('');
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const readStoredCustomCategories = () => {
     if (typeof window === 'undefined') return [] as string[];
@@ -447,6 +449,12 @@ export default function AdminProducts() {
     }
   };
 
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  };
+
   const addVariant = () => {
     setFormData((prev) => ({
       ...prev,
@@ -522,6 +530,70 @@ export default function AdminProducts() {
 
     return result;
   }, [products, searchTerm, sortBy]);
+
+  useEffect(() => {
+    const visibleSet = new Set(visibleProducts.map((product) => product._id));
+    setSelectedProductIds((prev) => prev.filter((id) => visibleSet.has(id)));
+  }, [visibleProducts]);
+
+  const allVisibleSelected =
+    visibleProducts.length > 0 && visibleProducts.every((product) => selectedProductIds.includes(product._id));
+
+  const toggleSelectAllVisible = () => {
+    if (allVisibleSelected) {
+      setSelectedProductIds([]);
+      return;
+    }
+    setSelectedProductIds(visibleProducts.map((product) => product._id));
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProductIds.length === 0) return;
+
+    const confirmed = window.confirm(
+      `Delete ${selectedProductIds.length} selected product(s) permanently?\n\nThis cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsBulkDeleting(true);
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (!token) {
+        alert('Please login as admin to delete products.');
+        return;
+      }
+
+      const targets = products.filter((product) => selectedProductIds.includes(product._id));
+      let deleted = 0;
+      let failed = 0;
+
+      for (const product of targets) {
+        try {
+          const res = await fetch(`${API_ROUTES.PRODUCTS}/${product._id}`, {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          if (res.ok) deleted += 1;
+          else failed += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+
+      await fetchProducts();
+      setSelectedProductIds([]);
+      if (failed > 0) {
+        alert(`Deleted ${deleted} product(s). Failed to delete ${failed} product(s).`);
+      } else {
+        alert(`Deleted ${deleted} product(s) successfully.`);
+      }
+    } finally {
+      setIsBulkDeleting(false);
+    }
+  };
 
   const customCategoryOptions = useMemo(() => {
     const defaultValues = new Set(CATEGORY_OPTIONS.map((option) => option.value.toLowerCase()));
@@ -729,19 +801,38 @@ export default function AdminProducts() {
             <option value="priceDesc">Sort: Price High to Low</option>
           </select>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center space-x-2 bg-[#D4AF37] text-black px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#bda871] transition-all whitespace-nowrap shadow-xl"
-        >
-          <Plus size={18} />
-          <span>Add New Fragrance</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleBulkDelete}
+            disabled={selectedProductIds.length === 0 || isBulkDeleting}
+            className="flex items-center space-x-2 bg-red-600/90 disabled:bg-[#1a1a1a] disabled:text-[#666] text-white px-4 py-3 rounded-xl text-sm font-bold hover:bg-red-500 transition-all whitespace-nowrap"
+          >
+            <Trash2 size={16} />
+            <span>{isBulkDeleting ? 'Deleting...' : `Delete Selected (${selectedProductIds.length})`}</span>
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center space-x-2 bg-[#D4AF37] text-black px-6 py-3 rounded-xl text-sm font-bold hover:bg-[#bda871] transition-all whitespace-nowrap shadow-xl"
+          >
+            <Plus size={18} />
+            <span>Add New Fragrance</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-black/50 text-[#888] text-[10px] uppercase tracking-[0.2em] font-bold">
+              <th className="px-4 py-6 w-10">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  onChange={toggleSelectAllVisible}
+                  aria-label="Select all visible products"
+                  className="w-3.5 h-3.5 accent-[#D4AF37] cursor-pointer"
+                />
+              </th>
               <th className="px-8 py-6">Product Information</th>
               <th className="px-6 py-6">Category</th>
               <th className="px-6 py-6">Stock Status</th>
@@ -752,11 +843,20 @@ export default function AdminProducts() {
           </thead>
           <tbody className="divide-y divide-[#1a1a1a]">
             {isLoading ? (
-              <tr><td colSpan={6} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">Inventory Manifest Loading...</td></tr>
+              <tr><td colSpan={7} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">Inventory Manifest Loading...</td></tr>
             ) : visibleProducts.length === 0 ? (
-              <tr><td colSpan={6} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">No products match your search/filter</td></tr>
+              <tr><td colSpan={7} className="py-20 text-center text-[#888] font-serif uppercase tracking-widest">No products match your search/filter</td></tr>
             ) : visibleProducts.map((product) => (
               <tr key={product._id} className="hover:bg-white/[0.01] transition-colors group">
+                <td className="px-4 py-6 align-top">
+                  <input
+                    type="checkbox"
+                    checked={selectedProductIds.includes(product._id)}
+                    onChange={() => toggleProductSelection(product._id)}
+                    aria-label={`Select ${product.name}`}
+                    className="mt-1 w-3.5 h-3.5 accent-[#D4AF37] cursor-pointer"
+                  />
+                </td>
                 <td className="px-8 py-6">
                   <div className="flex items-center space-x-4">
                     <div className="w-12 h-12 rounded-lg bg-[#111] overflow-hidden border border-[#1a1a1a] group-hover:border-[#D4AF37]/30 transition-colors">
