@@ -28,8 +28,6 @@ const SPECIAL_ROWS_5KG = [
   ['GIVEX 54192', 'ISSE MIYAKE'],
   ['GIVEX 64202', 'CIGAR'],
   ['PAREFX 11551', 'JANNAT EL FIRDAUS'],
-  ['BLACK INTENSE', 'BLACK OPIUM'],
-  ['CLASSIC SAFARI', 'SAFARI BY RALF LAURENT'],
 ];
 
 const SPECIAL_ROWS_25KG = [
@@ -57,6 +55,8 @@ const SPECIAL_ROWS_25KG = [
   ['ORIENTAL LOVE', 'Bacarrat Rouge 540'],
   ['SALVATION ARMY', 'DIOR SAVAGE'],
   ['BLACK GARDEN', 'Black opium'],
+  ['BLACK INTENSE', 'BLACK OPIUM'],
+  ['CLASSIC SAFARI', 'SAFARI BY RALF LAURENT'],
   ['OCEAN COOL', 'DAVIDOFF - COOL WATER'],
   ['ROUGH LIGHT', 'Rose Bulgaria'],
   ['GIVEX 59312', 'DRAKKAR : FOUGERE'],
@@ -208,11 +208,14 @@ const SPECIAL_ROWS = [
 ];
 
 const toSku = (firstColumn, weightKg) => `GIVEX${Number(weightKg)}KG${String(firstColumn || '').trim()}`;
-const toName = (secondColumn, weightKg) =>
-  `${String(secondColumn || '').trim()} ${Number(weightKg)}KG ESSENTIAL OIL`;
+const toName = (firstColumn, secondColumn, weightKg) => {
+  const useFirstColumnForName = Number(weightKg) === 25;
+  const baseName = useFirstColumnForName ? firstColumn : secondColumn;
+  return `${String(baseName || '').trim()} ${Number(weightKg)} KG ESSENTIAL OIL`;
+};
 
 const buildSpecialPayload = (firstColumn, secondColumn, weightKg) => ({
-  name: toName(secondColumn, weightKg),
+  name: toName(firstColumn, secondColumn, weightKg),
   sku: toSku(firstColumn, weightKg),
   description: 'Price on enquiry. Click GET BEST PRICE to request a callback.',
   price: 0,
