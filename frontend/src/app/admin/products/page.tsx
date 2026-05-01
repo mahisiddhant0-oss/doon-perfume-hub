@@ -63,10 +63,17 @@ type CategoryPayload = string | { value?: string };
 type CategoryObjectPayload = { value?: string; name?: string };
 
 const CATEGORY_OPTIONS = [
+  { value: 'all', label: 'All' },
   { value: 'perfumes', label: 'Perfumes' },
   { value: 'essential-oils', label: 'Essential Oils' },
   { value: 'bottles', label: 'Glass Bottles' },
 ];
+const CATEGORY_LABEL_OVERRIDES: Record<string, string> = {
+  all: 'All',
+  perfumes: 'Perfumes',
+  'essential-oils': 'Essential Oils',
+  bottles: 'Glass Bottles',
+};
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 
@@ -109,6 +116,12 @@ const normalizeCategoryNameKey = (value = '') =>
     .replace(/\s+/g, ' ')
     .replace(/\d+$/g, '')
     .trim();
+const getCategoryDisplayLabel = (value = '', categoryNamesByValue: Record<string, string> = {}) => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  if (CATEGORY_LABEL_OVERRIDES[normalized]) return CATEGORY_LABEL_OVERRIDES[normalized];
+  return categoryNamesByValue[normalized] || normalizeCategoryLabel(value);
+};
 
 export default function AdminProducts() {
   const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
@@ -184,10 +197,10 @@ export default function AdminProducts() {
       return known[strippedIndex];
     }
 
-    const rawLabel = categoryNamesByValue[normalized] || normalizeCategoryLabel(value);
+    const rawLabel = getCategoryDisplayLabel(value, categoryNamesByValue);
     const rawKey = normalizeCategoryNameKey(rawLabel);
     const byName = known.find((candidate) => {
-      const candidateLabel = categoryNamesByValue[candidate.toLowerCase()] || normalizeCategoryLabel(candidate);
+      const candidateLabel = getCategoryDisplayLabel(candidate, categoryNamesByValue);
       return normalizeCategoryNameKey(candidateLabel) === rawKey;
     });
     if (byName) return byName;
@@ -228,7 +241,7 @@ export default function AdminProducts() {
             const value = String((entry as CategoryObjectPayload).value || '').trim().toLowerCase();
             const name = String((entry as CategoryObjectPayload).name || '').trim();
             if (value) {
-              nameMap[value] = name || normalizeCategoryLabel(value);
+              nameMap[value] = CATEGORY_LABEL_OVERRIDES[value] || name || normalizeCategoryLabel(value);
             }
           }
         });
@@ -613,8 +626,7 @@ export default function AdminProducts() {
 
     const byName = new Map<string, string>();
     merged.forEach((category) => {
-      const categoryLower = category.toLowerCase();
-      const displayName = categoryNamesByValue[categoryLower] || normalizeCategoryLabel(category);
+      const displayName = getCategoryDisplayLabel(category, categoryNamesByValue);
       const key = normalizeCategoryNameKey(displayName);
       if (!byName.has(key)) {
         byName.set(key, category);
@@ -622,8 +634,8 @@ export default function AdminProducts() {
     });
 
     return Array.from(byName.values()).sort((a, b) => {
-      const aLabel = categoryNamesByValue[a.toLowerCase()] || normalizeCategoryLabel(a);
-      const bLabel = categoryNamesByValue[b.toLowerCase()] || normalizeCategoryLabel(b);
+      const aLabel = getCategoryDisplayLabel(a, categoryNamesByValue);
+      const bLabel = getCategoryDisplayLabel(b, categoryNamesByValue);
       return aLabel.localeCompare(bLabel);
     });
   }, [products, customCategoryPool, categoryNamesByValue]);
@@ -879,7 +891,9 @@ export default function AdminProducts() {
                       {(Array.isArray(product.categories) && product.categories.length > 0
                         ? product.categories
                         : [product.category]
-                      ).join(', ')}
+                      )
+                        .map((value) => getCategoryDisplayLabel(value, categoryNamesByValue))
+                        .join(', ')}
                     </span>
                   </div>
                 </td>
@@ -1026,7 +1040,7 @@ export default function AdminProducts() {
                       <span className="truncate">
                         {formData.categories.length > 0
                           ? formData.categories
-                              .map((value) => categoryNamesByValue[value.toLowerCase()] || normalizeCategoryLabel(value))
+                              .map((value) => getCategoryDisplayLabel(value, categoryNamesByValue))
                               .join(', ')
                           : 'Select category'}
                       </span>
@@ -1063,7 +1077,7 @@ export default function AdminProducts() {
                                   className="flex-1 min-w-0 flex items-center justify-between gap-2 text-left"
                                 >
                                   <span className="truncate">
-                                    {categoryNamesByValue[categoryValue.toLowerCase()] || normalizeCategoryLabel(categoryValue)}
+                                    {getCategoryDisplayLabel(categoryValue, categoryNamesByValue)}
                                   </span>
                                   <span
                                     className={`w-4 h-4 rounded border shrink-0 ${

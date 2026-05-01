@@ -14,7 +14,7 @@ const normalizeWeightKg = (value) => {
 
 const normalizeSku = (value = '') => String(value || '').trim();
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
-const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles', 'general'];
+const DEFAULT_CATEGORY_VALUES = ['all', 'perfumes', 'essential-oils', 'bottles', 'general'];
 const formatCategoryName = (value = '') =>
   String(value || '')
     .trim()
@@ -41,7 +41,9 @@ const normalizeCategories = (category, categories) => {
     return true;
   });
 
-  return uniqueCategories.length > 0 ? uniqueCategories : ['general'];
+  const baseCategories = uniqueCategories.length > 0 ? uniqueCategories : ['general'];
+  const hasAll = baseCategories.some((entry) => String(entry).toLowerCase() === 'all');
+  return hasAll ? baseCategories : [...baseCategories, 'all'];
 };
 
 const upsertCategories = async (categories = []) => {
