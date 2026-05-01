@@ -231,11 +231,15 @@ export default function ProductDetails() {
     try {
       setEnquiryLoading(true);
       setEnquiryError("");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
       const res = await fetch(API_ROUTES.PRODUCT_ENQUIRY(product._id), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: trimmedName, phone: normalizedPhone }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload?.message || "Failed to submit enquiry");
@@ -245,7 +249,11 @@ export default function ProductDetails() {
       setEnquiryName("");
       setEnquiryPhone("");
     } catch (error: any) {
-      setEnquiryError(error?.message || "Failed to submit enquiry");
+      if (error?.name === "AbortError") {
+        setEnquiryError("Request timed out. Please try again.");
+      } else {
+        setEnquiryError(error?.message || "Failed to submit enquiry");
+      }
     } finally {
       setEnquiryLoading(false);
     }
@@ -714,7 +722,7 @@ export default function ProductDetails() {
         <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md p-6 shadow-2xl text-center">
             <h3 className="text-lg font-serif text-gray-900 mb-3">Thanks for your enquiry</h3>
-            <p className="text-sm text-gray-700 mb-5">We will get back to you within 24 hours.</p>
+            <p className="text-sm text-gray-700 mb-5">WE&apos;LL REACH OUT TO YOU IN THE NEXT 24 HOURS! :-)</p>
             <button
               onClick={() => setIsEnquirySuccessOpen(false)}
               className="px-5 py-2 text-sm bg-black text-white hover:bg-gray-900"
