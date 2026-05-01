@@ -22,6 +22,7 @@ interface Variant {
   price: number;
   stock: number;
   weight: number;
+  image?: string;
 }
 
 interface Product {
@@ -57,6 +58,13 @@ const getPrimaryCategory = (product: Product) => {
     if (first) return first;
   }
   return String(product.category || "general");
+};
+const getIsProductOutOfStock = (product: Product) => {
+  const variantHasStock = Array.isArray(product.variants)
+    ? product.variants.some((variant) => Number(variant.stock || 0) > 0)
+    : false;
+  const baseHasStock = Number(product.stock || 0) > 0;
+  return !(variantHasStock || baseHasStock);
 };
 
 export default function ProductDetails() {
@@ -97,8 +105,13 @@ export default function ProductDetails() {
         if (!res.ok) throw new Error("Product not found");
         const data: Product = await res.json();
         setProduct(data);
-        if (data.images?.length > 0) setMainImage(data.images[0]);
-        if (data.variants?.length > 0) setSelectedVariant(data.variants[0]);
+        const fallbackImage = data.images?.[0] || DEFAULT_IMAGE;
+        setMainImage(fallbackImage);
+        if (data.variants?.length > 0) {
+          const firstVariant = data.variants[0];
+          setSelectedVariant(firstVariant);
+          setMainImage(firstVariant.image?.trim() || fallbackImage);
+        }
       } catch (err: any) {
         setError(err?.message || "Failed to load product");
       } finally {
@@ -111,6 +124,10 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (!product) return;
+    const isOutOfStock = selectedVariant
+      ? Number(selectedVariant.stock || 0) <= 0
+      : getIsProductOutOfStock(product);
+    if (isOutOfStock) return;
 
     const existing = localStorage.getItem("cart");
     const cart: CartItem[] = existing ? JSON.parse(existing) : [];
@@ -181,6 +198,14 @@ export default function ProductDetails() {
   }
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+  const isOutOfStock = selectedVariant
+    ? Number(selectedVariant.stock || 0) <= 0
+    : getIsProductOutOfStock(product);
+  const handleVariantSelect = (variant: Variant) => {
+    setSelectedVariant(variant);
+    const fallbackImage = product.images?.[0] || DEFAULT_IMAGE;
+    setMainImage(variant.image?.trim() || fallbackImage);
+  };
 
   return (
     <div className="bg-[var(--color-brand-bg)] min-h-screen pb-24">
@@ -394,8 +419,12 @@ export default function ProductDetails() {
               <span className="text-3xl font-medium text-gray-900">
                 Rs. {displayPrice.toLocaleString("en-IN")}
               </span>
-              <span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-1 uppercase tracking-wider">
-                In Stock
+              <span
+                className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wider ${
+                  isOutOfStock ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                }`}
+              >
+                {isOutOfStock ? "Out of Stock" : "In Stock"}
               </span>
             </div>
 
@@ -412,7 +441,7 @@ export default function ProductDetails() {
                   {product.variants.map((variant) => (
                     <button
                       key={variant.label}
-                      onClick={() => setSelectedVariant(variant)}
+                      onClick={() => handleVariantSelect(variant)}
                       className={`px-6 py-2 border text-sm transition-all ${
                         selectedVariant?.label === variant.label
                           ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-soft)] text-[var(--color-brand-primary)] font-semibold shadow-sm"
@@ -431,6 +460,7 @@ export default function ProductDetails() {
                 <button
                   className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={isOutOfStock}
                 >
                   -
                 </button>
@@ -443,6 +473,7 @@ export default function ProductDetails() {
                 <button
                   className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
                   onClick={() => setQuantity(quantity + 1)}
+                  disabled={isOutOfStock}
                 >
                   +
                 </button>
@@ -450,14 +481,18 @@ export default function ProductDetails() {
 
               <button
                 onClick={handleAddToCart}
-                disabled={addedToCart}
+                disabled={addedToCart || isOutOfStock}
                 className={`flex-1 h-14 flex items-center justify-center gap-3 font-bold tracking-widest text-sm transition-all duration-300 ${
-                  addedToCart
+                  isOutOfStock
+                    ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                    : addedToCart
                     ? "bg-green-600 text-white"
                     : "bg-black text-white hover:bg-gray-900 active:scale-[0.98]"
                 }`}
               >
-                {addedToCart ? (
+                {isOutOfStock ? (
+                  "OUT OF STOCK"
+                ) : addedToCart ? (
                   <>
                     <CheckCircle2 size={20} /> ADDED TO CART
                   </>
@@ -548,14 +583,16 @@ export default function ProductDetails() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
           <button
             onClick={handleAddToCart}
-            disabled={addedToCart}
+            disabled={addedToCart || isOutOfStock}
             className={`flex-1 h-14 font-bold tracking-widest text-sm transition-all ${
-              addedToCart
+              isOutOfStock
+                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                : addedToCart
                 ? "bg-green-600 text-white"
                 : "bg-[var(--color-brand-primary)] text-white hover:brightness-95"
             }`}
           >
-            {addedToCart ? "ADDED TO CART" : "ADD TO CART"}
+            {isOutOfStock ? "OUT OF STOCK" : addedToCart ? "ADDED TO CART" : "ADD TO CART"}
           </button>
           <Link
             href="/cart"

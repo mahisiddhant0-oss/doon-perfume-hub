@@ -11,12 +11,14 @@ import MyAccountDropdown from '@/components/MyAccountDropdown';
 interface Variant {
   label: string;
   price: number;
+  stock?: number;
 }
 
 interface Product {
   _id: string;
   name: string;
   price: number;
+  stock?: number;
   images: string[];
   category: string;
   categories?: string[];
@@ -93,6 +95,13 @@ function getProductCategories(product: Product): string[] {
   return rawCategories
     .map((entry) => String(entry || '').trim())
     .filter((entry) => entry.length > 0);
+}
+function getIsProductOutOfStock(product: Product): boolean {
+  const variantHasStock = Array.isArray(product.variants)
+    ? product.variants.some((variant) => Number(variant.stock || 0) > 0)
+    : false;
+  const baseHasStock = Number(product.stock || 0) > 0;
+  return !(variantHasStock || baseHasStock);
 }
 
 function formatCategoryLabel(value: string) {
@@ -496,11 +505,19 @@ function ProductsPageContent() {
             <>
               <p className="text-sm text-gray-400 mb-6">{products.length} products found</p>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {products.map((product) => (
-                  <Link
-                    href={`/products/${product._id}`}
+                {products.map((product) => {
+                  const isOutOfStock = getIsProductOutOfStock(product);
+                  const CardWrapper = isOutOfStock ? "div" : Link;
+                  const cardProps = isOutOfStock
+                    ? {}
+                    : { href: `/products/${product._id}` };
+                  return (
+                  <CardWrapper
+                    {...cardProps}
                     key={product._id}
-                    className="group flex flex-col bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                    className={`group flex flex-col bg-white overflow-hidden shadow-sm transition-shadow ${
+                      isOutOfStock ? "opacity-95 cursor-not-allowed" : "hover:shadow-md"
+                    }`}
                   >
                     <div className="relative aspect-[4/5] bg-gray-50 overflow-hidden">
                       <Image
@@ -518,6 +535,11 @@ function ProductsPageContent() {
                           {product.variants.length} sizes
                         </div>
                       )}
+                      {isOutOfStock && (
+                        <div className="absolute top-3 right-3 z-10 bg-red-600 text-white text-[10px] uppercase font-bold tracking-wider px-2 py-1">
+                          Out of Stock
+                        </div>
+                      )}
                     </div>
                     <div className="p-3 sm:p-5 text-center flex flex-col flex-grow">
                       <span className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">
@@ -530,13 +552,19 @@ function ProductsPageContent() {
                           : `₹${product.price.toLocaleString('en-IN')}`}
                       </p>
                       <div className="mt-auto">
-                        <span className="block w-full border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] py-2 text-xs tracking-widest font-semibold group-hover:bg-[var(--color-brand-primary)] group-hover:text-white transition-colors duration-300">
-                          VIEW PRODUCT
-                        </span>
+                        {isOutOfStock ? (
+                          <span className="block w-full border border-gray-300 bg-gray-200 text-gray-600 py-2 text-xs tracking-widest font-semibold cursor-not-allowed">
+                            OUT OF STOCK
+                          </span>
+                        ) : (
+                          <span className="block w-full border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] py-2 text-xs tracking-widest font-semibold group-hover:bg-[var(--color-brand-primary)] group-hover:text-white transition-colors duration-300">
+                            VIEW PRODUCT
+                          </span>
+                        )}
                       </div>
                     </div>
-                  </Link>
-                ))}
+                  </CardWrapper>
+                )})}
               </div>
             </>
           )}
