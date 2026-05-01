@@ -138,7 +138,16 @@ export default function Home() {
       }
     }
 
-    return [{ name: 'All', icon: CATEGORY_ICON_MAP.all, slug: '', hasCustomImage: false }, ...Array.from(map.values())];
+    const allMeta = categoryMetaMap.all;
+    return [
+      {
+        name: normalizeDisplayLabel(allMeta?.name || 'All'),
+        icon: allMeta?.image || CATEGORY_ICON_MAP.all,
+        slug: '',
+        hasCustomImage: Boolean(allMeta?.image),
+      },
+      ...Array.from(map.values()),
+    ];
   }, [backendCategories, categoryMetaMap]);
 
   const categoryColumns = useMemo(() => {
@@ -226,7 +235,7 @@ export default function Home() {
         entries.forEach((entry) => {
           if (!entry || typeof entry === 'string') return;
           const value = String(entry.value || '').trim().toLowerCase();
-          if (!value || EXCLUDED_CATEGORY_VALUES.has(value) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(value)) return;
+          if (!value || EXCLUDED_CATEGORY_VALUES.has(value)) return;
           metaMap[value] = {
             _id: entry._id,
             value,
