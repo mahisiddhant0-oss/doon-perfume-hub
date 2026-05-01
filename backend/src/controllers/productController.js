@@ -486,15 +486,24 @@ const submitProductEnquiry = async (req, res) => {
       return res.status(400).json({ message: 'Please enter a valid phone number.' });
     }
 
-    await sendPriceEnquiryAlert({
-      productName: product.name,
-      sku: product.sku,
-      productId: product._id,
-      customerName: name,
-      phone: normalizedPhone,
-    });
+    let emailSent = true;
+    try {
+      await sendPriceEnquiryAlert({
+        productName: product.name,
+        sku: product.sku,
+        productId: product._id,
+        customerName: name,
+        phone: normalizedPhone,
+      });
+    } catch (emailError) {
+      emailSent = false;
+      console.error('Price enquiry email failed:', emailError.message);
+    }
 
-    return res.status(201).json({ message: 'Enquiry submitted successfully' });
+    return res.status(201).json({
+      message: 'Enquiry submitted successfully',
+      emailSent,
+    });
   } catch (error) {
     return res.status(500).json({ message: 'Failed to submit enquiry', error: error.message });
   }
