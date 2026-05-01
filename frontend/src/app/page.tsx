@@ -26,9 +26,8 @@ type CategoryMeta = {
 
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
-const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['general', 'all']);
+const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['all']);
 const DEFAULT_CATEGORY_VALUES = ['perfumes', 'essential-oils', 'bottles'];
-const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const CATEGORY_ICON_MAP: Record<string, string> = {
   all: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   general: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
@@ -66,7 +65,6 @@ export default function Home() {
   const [allProducts, setAllProducts] = useState<Product[]>([]);
   const [backendCategories, setBackendCategories] = useState<string[]>([]);
   const [categoryMetaMap, setCategoryMetaMap] = useState<Record<string, CategoryMeta>>({});
-  const [storedCustomCategories, setStoredCustomCategories] = useState<string[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [mobileSearchKeyword, setMobileSearchKeyword] = useState('');
@@ -153,7 +151,7 @@ export default function Home() {
       }
     }
 
-    for (const categoryValue of [...backendCategories, ...storedCustomCategories]) {
+    for (const categoryValue of backendCategories) {
       const normalized = String(categoryValue || '').trim().toLowerCase();
       if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(normalized)) continue;
       if (!map.has(normalized)) {
@@ -171,7 +169,7 @@ export default function Home() {
       { name: 'All', icon: CATEGORY_ICON_MAP.all, slug: '', hasCustomImage: false },
       ...Array.from(map.values()),
     ];
-  }, [allProducts, backendCategories, storedCustomCategories, categoryMetaMap]);
+  }, [allProducts, backendCategories, categoryMetaMap]);
 
   const categoryColumns = useMemo(() => {
     const columns: Array<Array<(typeof categories)[number] | null>> = [];
@@ -237,32 +235,6 @@ export default function Home() {
     window.addEventListener('storage', loadCartCount);
 
     return () => window.removeEventListener('storage', loadCartCount);
-  }, []);
-
-  useEffect(() => {
-    const loadStoredCustomCategories = () => {
-      try {
-        const raw = window.localStorage.getItem(LOCAL_CUSTOM_CATEGORIES_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        const normalized = Array.isArray(parsed)
-          ? parsed
-              .map((entry) => String(entry || '').trim().toLowerCase())
-              .filter((entry) => entry.length > 0 && !EXCLUDED_CATEGORY_VALUES.has(entry))
-          : [];
-        setStoredCustomCategories(Array.from(new Set(normalized)));
-      } catch {
-        setStoredCustomCategories([]);
-      }
-    };
-
-    loadStoredCustomCategories();
-    window.addEventListener('storage', loadStoredCustomCategories);
-    window.addEventListener('focus', loadStoredCustomCategories);
-
-    return () => {
-      window.removeEventListener('storage', loadStoredCustomCategories);
-      window.removeEventListener('focus', loadStoredCustomCategories);
-    };
   }, []);
 
   useEffect(() => {
