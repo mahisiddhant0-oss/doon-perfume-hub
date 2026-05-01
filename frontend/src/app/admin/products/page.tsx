@@ -67,12 +67,27 @@ const CATEGORY_OPTIONS = [
   { value: 'perfumes', label: 'Perfumes' },
   { value: 'essential-oils', label: 'Essential Oils' },
   { value: 'bottles', label: 'Glass Bottles' },
+  { value: 'general', label: 'General' },
+  { value: 'cap', label: 'CAP' },
+  { value: 'summertime', label: 'SUMMERTIME' },
+  { value: 'officewear', label: 'OFFICEWEAR' },
+  { value: 'winterwear', label: 'WINTERWEAR' },
+  { value: 'partywear', label: 'PARTYWEAR' },
+  { value: 'equipments', label: 'EQUIPMENTS' },
 ];
+const ALLOWED_ADMIN_CATEGORY_VALUES = new Set(CATEGORY_OPTIONS.map((entry) => entry.value.toLowerCase()));
 const CATEGORY_LABEL_OVERRIDES: Record<string, string> = {
   all: 'All',
   perfumes: 'Perfumes',
   'essential-oils': 'Essential Oils',
   bottles: 'Glass Bottles',
+  general: 'General',
+  cap: 'CAP',
+  summertime: 'SUMMERTIME',
+  officewear: 'OFFICEWEAR',
+  winterwear: 'WINTERWEAR',
+  partywear: 'PARTYWEAR',
+  equipments: 'EQUIPMENTS',
 };
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
@@ -174,7 +189,12 @@ export default function AdminProducts() {
       for (const rawEntry of source) {
         const entry = String(rawEntry || '').trim();
         const normalized = entry.toLowerCase();
-        if (!entry || EXCLUDED_CATEGORY_VALUES.has(normalized) || seen.has(normalized)) continue;
+        if (
+          !entry ||
+          EXCLUDED_CATEGORY_VALUES.has(normalized) ||
+          !ALLOWED_ADMIN_CATEGORY_VALUES.has(normalized) ||
+          seen.has(normalized)
+        ) continue;
         seen.add(normalized);
         merged.push(entry);
       }
@@ -286,7 +306,10 @@ export default function AdminProducts() {
         }
         return [String(product.category || '').trim()].filter(Boolean);
       })
-      .filter((entry) => !EXCLUDED_CATEGORY_VALUES.has(entry.toLowerCase()));
+      .filter((entry) => {
+        const normalized = entry.toLowerCase();
+        return !EXCLUDED_CATEGORY_VALUES.has(normalized) && ALLOWED_ADMIN_CATEGORY_VALUES.has(normalized);
+      });
 
     setCustomCategoryPool((prevPool) => {
       const nextPool = mergeCategoryValues(prevPool, categoriesFromProducts);
@@ -620,9 +643,10 @@ export default function AdminProducts() {
       .filter((category) => !EXCLUDED_CATEGORY_VALUES.has(category.toLowerCase()))
       .filter((category) => !defaultValues.has(category.toLowerCase()));
 
-    const merged = mergeCategoryValues(categories, customCategoryPool).filter(
-      (category) => !defaultValues.has(category.toLowerCase())
-    );
+    const merged = mergeCategoryValues(categories, customCategoryPool).filter((category) => {
+      const normalized = category.toLowerCase();
+      return !defaultValues.has(normalized) && ALLOWED_ADMIN_CATEGORY_VALUES.has(normalized);
+    });
 
     const byName = new Map<string, string>();
     merged.forEach((category) => {
@@ -640,16 +664,13 @@ export default function AdminProducts() {
     });
   }, [products, customCategoryPool, categoryNamesByValue]);
 
-  const allCategoryOptions = useMemo(
-    () =>
-      mergeCategoryValues(
-        CATEGORY_OPTIONS.map((option) => option.value),
-        customCategoryOptions,
-        customCategoryPool,
-        formData.categories
-      ),
-    [customCategoryOptions, customCategoryPool, formData.categories]
-  );
+  const allCategoryOptions = useMemo(() => {
+    const allowed = CATEGORY_OPTIONS.map((option) => option.value);
+    const selectedAllowed = formData.categories.filter((entry) =>
+      ALLOWED_ADMIN_CATEGORY_VALUES.has(String(entry || '').toLowerCase())
+    );
+    return mergeCategoryValues(allowed, customCategoryOptions, customCategoryPool, selectedAllowed);
+  }, [customCategoryOptions, customCategoryPool, formData.categories]);
 
   const addCustomCategoryToForm = async () => {
     const typedCategory = customCategoryInput.trim();
@@ -1089,16 +1110,6 @@ export default function AdminProducts() {
                             );
                           })}
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsCreatingCustomCategory(true);
-                            setIsCategoryDropdownOpen(false);
-                          }}
-                          className="w-full px-3 py-2 text-left text-sm border-t border-[#1a1a1a] text-[#D4AF37] hover:bg-[#111]"
-                        >
-                          Create Custom Category
-                        </button>
                       </div>
                     ) : null}
                   </div>
