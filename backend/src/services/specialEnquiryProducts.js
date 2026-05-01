@@ -246,6 +246,13 @@ const buildSpecialPayload = (firstColumn, secondColumn, weightKg) => {
         image: '',
       },
       {
+        label: '500ml',
+        price: price100ml * 5 + 78,
+        stock: 50,
+        weight: 1,
+        image: '',
+      },
+      {
         label: `${numericWeight}kg`,
         price: 0,
         stock: 0,
