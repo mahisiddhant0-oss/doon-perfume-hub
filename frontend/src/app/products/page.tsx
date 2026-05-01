@@ -44,6 +44,7 @@ const DEFAULT_CATEGORY_OPTIONS = [
   { label: 'General', value: 'general' },
 ];
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
+const HIDDEN_FILTER_CATEGORY_VALUES = new Set(['all']);
 
 const MAX_SEARCH_INPUT_LENGTH = 2000;
 const MAX_SEARCH_QUERY_LENGTH = 120;
@@ -137,7 +138,7 @@ function ProductsPageContent() {
       for (const value of getProductCategories(product)) {
         if (!value) continue;
         const key = value.toLowerCase();
-        if (EXCLUDED_CATEGORY_VALUES.has(key)) continue;
+        if (EXCLUDED_CATEGORY_VALUES.has(key) || HIDDEN_FILTER_CATEGORY_VALUES.has(key)) continue;
         if (!map.has(key)) {
           map.set(key, {
             value,
@@ -150,7 +151,7 @@ function ProductsPageContent() {
     for (const value of backendCategories) {
       if (!value) continue;
       const key = value.toLowerCase();
-      if (EXCLUDED_CATEGORY_VALUES.has(key)) continue;
+      if (EXCLUDED_CATEGORY_VALUES.has(key) || HIDDEN_FILTER_CATEGORY_VALUES.has(key)) continue;
       if (!map.has(key)) {
         map.set(key, {
           value,
