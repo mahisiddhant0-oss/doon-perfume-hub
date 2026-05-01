@@ -27,20 +27,6 @@ type CategoryMeta = {
 const DEFAULT_IMAGE = 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=800&q=80';
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const HIDDEN_FRONTEND_CATEGORY_VALUES = new Set(['all']);
-const HOMEPAGE_ALLOWED_CATEGORY_ORDER = [
-  'all',
-  'perfumes',
-  'essential-oils',
-  'bottles',
-  'general',
-  'cap',
-  'summertime',
-  'officewear',
-  'winterwear',
-  'partywear',
-  'equipments',
-];
-const DEFAULT_CATEGORY_VALUES = HOMEPAGE_ALLOWED_CATEGORY_ORDER.filter((value) => value !== 'all');
 const CATEGORY_ICON_MAP: Record<string, string> = {
   all: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
   general: 'https://cdn-icons-png.flaticon.com/512/3753/3753123.png',
@@ -138,32 +124,6 @@ export default function Home() {
   const categories = useMemo(() => {
     const map = new Map<string, { name: string; icon: string; slug: string; hasCustomImage: boolean }>();
 
-    for (const categoryValue of DEFAULT_CATEGORY_VALUES) {
-      const meta = categoryMetaMap[categoryValue];
-      map.set(categoryValue, {
-        slug: categoryValue,
-        name: normalizeDisplayLabel(meta?.name || categoryValue),
-        icon: meta?.image || CATEGORY_ICON_MAP[categoryValue] || CATEGORY_ICON_MAP.general,
-        hasCustomImage: Boolean(meta?.image),
-      });
-    }
-
-    for (const product of allProducts) {
-      for (const categoryValue of getProductCategories(product)) {
-        const normalized = categoryValue.toLowerCase();
-        if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(normalized)) continue;
-        if (!map.has(normalized)) {
-          const meta = categoryMetaMap[normalized];
-          map.set(normalized, {
-            slug: categoryValue,
-            name: normalizeDisplayLabel(meta?.name || categoryValue),
-            icon: meta?.image || CATEGORY_ICON_MAP[normalized] || CATEGORY_ICON_MAP.general,
-            hasCustomImage: Boolean(meta?.image),
-          });
-        }
-      }
-    }
-
     for (const categoryValue of backendCategories) {
       const normalized = String(categoryValue || '').trim().toLowerCase();
       if (!normalized || EXCLUDED_CATEGORY_VALUES.has(normalized) || HIDDEN_FRONTEND_CATEGORY_VALUES.has(normalized)) continue;
@@ -178,17 +138,8 @@ export default function Home() {
       }
     }
 
-    const allowedSet = new Set(HOMEPAGE_ALLOWED_CATEGORY_ORDER);
-    const ordered = HOMEPAGE_ALLOWED_CATEGORY_ORDER.filter((value) => value !== 'all')
-      .map((value) => map.get(value))
-      .filter((entry): entry is { name: string; icon: string; slug: string; hasCustomImage: boolean } => Boolean(entry));
-    const dynamicAllowed = Array.from(map.entries())
-      .filter(([key]) => allowedSet.has(key) && key !== 'all')
-      .map(([, value]) => value)
-      .filter((entry) => !ordered.some((existing) => existing.slug.toLowerCase() === entry.slug.toLowerCase()));
-
-    return [{ name: 'All', icon: CATEGORY_ICON_MAP.all, slug: '', hasCustomImage: false }, ...ordered, ...dynamicAllowed];
-  }, [allProducts, backendCategories, categoryMetaMap]);
+    return [{ name: 'All', icon: CATEGORY_ICON_MAP.all, slug: '', hasCustomImage: false }, ...Array.from(map.values())];
+  }, [backendCategories, categoryMetaMap]);
 
   const categoryColumns = useMemo(() => {
     const columns: Array<Array<(typeof categories)[number] | null>> = [];
