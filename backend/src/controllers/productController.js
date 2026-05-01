@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const ProductCategory = require('../models/ProductCategory');
+const { sendPriceEnquiryAlert } = require('../services/emailService');
 const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
 const normalizeKeyword = (value = '') => String(value).trim().slice(0, MAX_SEARCH_KEYWORD_LENGTH);
@@ -356,7 +357,7 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, categories, stock, images, attributes, weightKg, variants } = req.body;
+    const { name, description, price, sku, category, categories, stock, images, attributes, weightKg, variants, enquiryOnly } = req.body;
     const normalizedCategories = normalizeCategories(category, categories);
     const normalizedSku = normalizeSku(sku);
 
@@ -377,6 +378,7 @@ const createProduct = async (req, res) => {
       images,
       attributes,
       variants: normalizeVariants(variants),
+      enquiryOnly: Boolean(enquiryOnly),
     });
 
     const createdProduct = await product.save();
@@ -398,7 +400,7 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, categories, stock, images, attributes, isActive, weightKg, variants } = req.body;
+    const { name, description, price, sku, category, categories, stock, images, attributes, isActive, weightKg, variants, enquiryOnly } = req.body;
 
     const product = await Product.findById(req.params.id);
 
@@ -423,6 +425,7 @@ const updateProduct = async (req, res) => {
       if (attributes) product.attributes = attributes;
       if (variants !== undefined) product.variants = normalizeVariants(variants);
       if (isActive !== undefined) product.isActive = isActive;
+      if (enquiryOnly !== undefined) product.enquiryOnly = Boolean(enquiryOnly);
 
       const updatedProduct = await product.save();
       const freshProduct = await Product.findById(updatedProduct._id);
@@ -459,6 +462,44 @@ const deleteProduct = async (req, res) => {
   }
 };
 
+// @desc    Submit price enquiry for enquiry-only products
+// @route   POST /api/products/:id/enquiry
+// @access  Public
+const submitProductEnquiry = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id).select('name sku enquiryOnly');
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    if (!product.enquiryOnly) {
+      return res.status(400).json({ message: 'This product does not support price enquiry.' });
+    }
+
+    const name = String(req.body?.name || '').trim();
+    const phone = String(req.body?.phone || '').trim();
+    const normalizedPhone = phone.replace(/[^\d+]/g, '');
+
+    if (name.length < 2 || name.length > 100) {
+      return res.status(400).json({ message: 'Please enter a valid name.' });
+    }
+    if (!/^(\+?\d{10,15})$/.test(normalizedPhone)) {
+      return res.status(400).json({ message: 'Please enter a valid phone number.' });
+    }
+
+    await sendPriceEnquiryAlert({
+      productName: product.name,
+      sku: product.sku,
+      productId: product._id,
+      customerName: name,
+      phone: normalizedPhone,
+    });
+
+    return res.status(201).json({ message: 'Enquiry submitted successfully' });
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to submit enquiry', error: error.message });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -469,5 +510,6 @@ module.exports = {
   getProductById,
   createProduct,
   updateProduct,
-  deleteProduct
+  deleteProduct,
+  submitProductEnquiry,
 };

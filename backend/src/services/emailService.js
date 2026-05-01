@@ -206,8 +206,42 @@ const sendLoginOtpEmail = async ({ email, otp, name }) => {
   }
 };
 
+const sendPriceEnquiryAlert = async ({ productName, sku, productId, customerName, phone }) => {
+  if (!isSmtpConfigured()) {
+    throw new Error('SMTP is not configured. Unable to deliver enquiry email.');
+  }
+
+  const recipient = String(process.env.ADMIN_EMAIL || '').trim() || 'doonperfumehub@gmail.com';
+  const subject = `Price Enquiry: ${productName || 'Special Product'}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden;">
+      <div style="background: #0b4ea2; color: #ffffff; padding: 16px 20px;">
+        <h2 style="margin: 0; font-size: 20px;">DOON PERFUME HUB - Price Enquiry</h2>
+      </div>
+      <div style="padding: 20px; color: #111827;">
+        <p style="margin-top: 0;">A customer requested the best price for an enquiry-only product.</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 14px;">
+          <tr><td style="padding: 8px 0; color: #6b7280;">Product</td><td style="padding: 8px 0; font-weight: 600;">${productName || '-'}</td></tr>
+          <tr><td style="padding: 8px 0; color: #6b7280;">SKU</td><td style="padding: 8px 0; font-weight: 600;">${sku || '-'}</td></tr>
+          <tr><td style="padding: 8px 0; color: #6b7280;">Product ID</td><td style="padding: 8px 0; font-weight: 600;">${productId || '-'}</td></tr>
+          <tr><td style="padding: 8px 0; color: #6b7280;">Customer Name</td><td style="padding: 8px 0; font-weight: 600;">${customerName || '-'}</td></tr>
+          <tr><td style="padding: 8px 0; color: #6b7280;">Phone Number</td><td style="padding: 8px 0; font-weight: 600;">${phone || '-'}</td></tr>
+        </table>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: resolveFromAddress('DOON PERFUME HUB'),
+    to: recipient,
+    subject,
+    html,
+  });
+};
+
 module.exports = {
   sendOrderConfirmation,
   sendAdminNewOrderAlert,
   sendLoginOtpEmail,
+  sendPriceEnquiryAlert,
 };

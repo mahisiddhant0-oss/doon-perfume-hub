@@ -14,6 +14,7 @@ export const API_BASE =
 export const API_ROUTES = {
   AUTH: `${API_BASE}/api/auth`,
   PRODUCTS: `${API_BASE}/api/products`,
+  PRODUCT_ENQUIRY: (id: string) => `${API_BASE}/api/products/${id}/enquiry`,
   PRODUCT_CATEGORIES: `${API_BASE}/api/products/categories`,
   PRODUCT_CATEGORY_BY_ID: (id: string) => `${API_BASE}/api/products/categories/${id}`,
   CART: `${API_BASE}/api/cart`,

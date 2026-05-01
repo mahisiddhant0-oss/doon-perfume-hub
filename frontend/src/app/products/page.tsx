@@ -18,6 +18,7 @@ interface Product {
   _id: string;
   name: string;
   price: number;
+  enquiryOnly?: boolean;
   stock?: number;
   images: string[];
   category: string;
@@ -506,7 +507,8 @@ function ProductsPageContent() {
               <p className="text-sm text-gray-400 mb-6">{products.length} products found</p>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {products.map((product) => {
-                  const isOutOfStock = getIsProductOutOfStock(product);
+                  const isEnquiryOnly = Boolean(product.enquiryOnly);
+                  const isOutOfStock = !isEnquiryOnly && getIsProductOutOfStock(product);
                   const cardClassName = `group flex flex-col bg-white overflow-hidden shadow-sm transition-shadow ${
                     isOutOfStock ? "opacity-95 cursor-not-allowed" : "hover:shadow-md"
                   }`;
@@ -540,9 +542,11 @@ function ProductsPageContent() {
                       </span>
                       <h3 className="font-serif text-sm sm:text-base text-gray-900 mb-2 leading-snug">{product.name}</h3>
                       <p className="text-gray-700 font-medium mb-4">
-                        {product.variants.length > 0
-                          ? `From ₹${Math.min(...product.variants.map(v => v.price)).toLocaleString('en-IN')}`
-                          : `₹${product.price.toLocaleString('en-IN')}`}
+                        {isEnquiryOnly
+                          ? 'BOOK NOW'
+                          : product.variants.length > 0
+                            ? `From ₹${Math.min(...product.variants.map(v => v.price)).toLocaleString('en-IN')}`
+                            : `₹${product.price.toLocaleString('en-IN')}`}
                       </p>
                       <div className="mt-auto">
                         {isOutOfStock ? (
@@ -551,7 +555,7 @@ function ProductsPageContent() {
                           </span>
                         ) : (
                           <span className="block w-full border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] py-2 text-xs tracking-widest font-semibold group-hover:bg-[var(--color-brand-primary)] group-hover:text-white transition-colors duration-300">
-                            VIEW PRODUCT
+                            {isEnquiryOnly ? 'BOOK NOW' : 'VIEW PRODUCT'}
                           </span>
                         )}
                       </div>
@@ -590,3 +594,4 @@ export default function ProductsPage() {
     </Suspense>
   );
 }
+

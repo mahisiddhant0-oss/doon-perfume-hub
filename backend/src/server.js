@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const { getAllowedOrigins, getPrimaryFrontendUrl, isOriginAllowed, isProduction, validateEnv } = require('./config/env');
 const Order = require('./models/Order');
 const Counter = require('./models/Counter');
+const { upsertSpecialEnquiryProducts } = require('./services/specialEnquiryProducts');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -140,8 +141,21 @@ const reconcileOrderCodes = async () => {
   }
 };
 
+const seedSpecialEnquiryCatalog = async () => {
+  try {
+    if (mongoose.connection?.readyState !== 1) return;
+    const result = await upsertSpecialEnquiryProducts();
+    console.log(
+      `Special enquiry products sync completed. Created ${result.created}, Updated ${result.updated}, Total ${result.total}`
+    );
+  } catch (error) {
+    console.error('Special enquiry products sync failed:', error.message);
+  }
+};
+
 setTimeout(() => {
   reconcileOrderCodes();
+  seedSpecialEnquiryCatalog();
 }, 5000);
 
 app.use('/api/auth', authRoutes);

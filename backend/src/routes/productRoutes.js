@@ -11,6 +11,7 @@ const {
   createProduct,
   updateProduct,
   deleteProduct,
+  submitProductEnquiry,
 } = require('../controllers/productController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { productValidation } = require('../middlewares/validationMiddleware');
@@ -20,6 +21,7 @@ router.route('/categories').get(getProductCategories);
 router.route('/categories/:id').get(getProductCategoryById);
 router.route('/').get(getProducts);
 router.route('/:id').get(getProductById);
+router.route('/:id/enquiry').post(submitProductEnquiry);
 
 // Admin-only routes
 router.route('/categories').post(protect, adminRights, createProductCategory);

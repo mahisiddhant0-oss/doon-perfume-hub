@@ -29,6 +29,11 @@ const productSchema = new mongoose.Schema({
     required: true,
     min: 0
   },
+  enquiryOnly: {
+    type: Boolean,
+    default: false,
+    index: true,
+  },
   category: {
     type: String,
     required: true,

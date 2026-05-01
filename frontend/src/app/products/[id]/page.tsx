@@ -30,6 +30,7 @@ interface Product {
   name: string;
   description: string;
   price: number;
+  enquiryOnly?: boolean;
   weightKg?: number;
   images: string[];
   category: string;
@@ -80,6 +81,12 @@ export default function ProductDetails() {
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
   const [mainImage, setMainImage] = useState(DEFAULT_IMAGE);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [isEnquiryModalOpen, setIsEnquiryModalOpen] = useState(false);
+  const [isEnquirySuccessOpen, setIsEnquirySuccessOpen] = useState(false);
+  const [enquiryName, setEnquiryName] = useState("");
+  const [enquiryPhone, setEnquiryPhone] = useState("");
+  const [enquiryError, setEnquiryError] = useState("");
+  const [enquiryLoading, setEnquiryLoading] = useState(false);
 
   useEffect(() => {
     const loadCart = () => {
@@ -124,6 +131,7 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (!product) return;
+    if (product.enquiryOnly) return;
     const isOutOfStock = selectedVariant
       ? Number(selectedVariant.stock || 0) <= 0
       : getIsProductOutOfStock(product);
@@ -198,9 +206,50 @@ export default function ProductDetails() {
   }
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
+  const isEnquiryOnly = Boolean(product.enquiryOnly);
   const isOutOfStock = selectedVariant
     ? Number(selectedVariant.stock || 0) <= 0
     : getIsProductOutOfStock(product);
+  const isActionDisabled = isEnquiryOnly ? false : isOutOfStock;
+  const handleOpenEnquiryModal = () => {
+    setEnquiryError("");
+    setIsEnquiryModalOpen(true);
+  };
+  const handleSubmitEnquiry = async () => {
+    if (!product) return;
+    const trimmedName = enquiryName.trim();
+    const normalizedPhone = enquiryPhone.replace(/[^\d+]/g, '');
+    if (trimmedName.length < 2) {
+      setEnquiryError("Please enter a valid name.");
+      return;
+    }
+    if (!/^(\+?\d{10,15})$/.test(normalizedPhone)) {
+      setEnquiryError("Please enter a valid phone number.");
+      return;
+    }
+
+    try {
+      setEnquiryLoading(true);
+      setEnquiryError("");
+      const res = await fetch(API_ROUTES.PRODUCT_ENQUIRY(product._id), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: trimmedName, phone: normalizedPhone }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.message || "Failed to submit enquiry");
+      }
+      setIsEnquiryModalOpen(false);
+      setIsEnquirySuccessOpen(true);
+      setEnquiryName("");
+      setEnquiryPhone("");
+    } catch (error: any) {
+      setEnquiryError(error?.message || "Failed to submit enquiry");
+    } finally {
+      setEnquiryLoading(false);
+    }
+  };
   const handleVariantSelect = (variant: Variant) => {
     setSelectedVariant(variant);
     const fallbackImage = product.images?.[0] || DEFAULT_IMAGE;
@@ -417,14 +466,18 @@ export default function ProductDetails() {
 
             <div className="flex items-center gap-4 mb-6">
               <span className="text-3xl font-medium text-gray-900">
-                Rs. {displayPrice.toLocaleString("en-IN")}
+                {isEnquiryOnly ? "BOOK NOW" : `Rs. ${displayPrice.toLocaleString("en-IN")}`}
               </span>
               <span
                 className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wider ${
-                  isOutOfStock ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"
+                  isEnquiryOnly
+                    ? "bg-blue-50 text-blue-700"
+                    : isOutOfStock
+                      ? "bg-red-50 text-red-700"
+                      : "bg-green-50 text-green-700"
                 }`}
               >
-                {isOutOfStock ? "Out of Stock" : "In Stock"}
+                {isEnquiryOnly ? "Price Enquiry" : isOutOfStock ? "Out of Stock" : "In Stock"}
               </span>
             </div>
 
@@ -456,52 +509,63 @@ export default function ProductDetails() {
             )}
 
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
-              <div className="flex items-center border border-gray-200 h-14 w-full sm:w-36 bg-white">
-                <button
-                  className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={isOutOfStock}
-                >
-                  -
-                </button>
-                <input
-                  type="text"
-                  value={quantity}
-                  readOnly
-                  className="w-full text-center text-sm font-medium focus:outline-none bg-transparent"
-                />
-                <button
-                  className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
-                  onClick={() => setQuantity(quantity + 1)}
-                  disabled={isOutOfStock}
-                >
-                  +
-                </button>
-              </div>
+              {!isEnquiryOnly ? (
+                <>
+                  <div className="flex items-center border border-gray-200 h-14 w-full sm:w-36 bg-white">
+                    <button
+                      className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      disabled={isActionDisabled}
+                    >
+                      -
+                    </button>
+                    <input
+                      type="text"
+                      value={quantity}
+                      readOnly
+                      className="w-full text-center text-sm font-medium focus:outline-none bg-transparent"
+                    />
+                    <button
+                      className="w-12 h-full flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-50 transition-colors"
+                      onClick={() => setQuantity(quantity + 1)}
+                      disabled={isActionDisabled}
+                    >
+                      +
+                    </button>
+                  </div>
 
-              <button
-                onClick={handleAddToCart}
-                disabled={addedToCart || isOutOfStock}
-                className={`flex-1 h-14 flex items-center justify-center gap-3 font-bold tracking-widest text-sm transition-all duration-300 ${
-                  isOutOfStock
-                    ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                    : addedToCart
-                    ? "bg-green-600 text-white"
-                    : "bg-black text-white hover:bg-gray-900 active:scale-[0.98]"
-                }`}
-              >
-                {isOutOfStock ? (
-                  "OUT OF STOCK"
-                ) : addedToCart ? (
-                  <>
-                    <CheckCircle2 size={20} /> ADDED TO CART
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart size={18} strokeWidth={2} /> ADD TO CART
-                  </>
-                )}
-              </button>
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={addedToCart || isActionDisabled}
+                    className={`flex-1 h-14 flex items-center justify-center gap-3 font-bold tracking-widest text-sm transition-all duration-300 ${
+                      isActionDisabled
+                        ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                        : addedToCart
+                          ? "bg-green-600 text-white"
+                          : "bg-black text-white hover:bg-gray-900 active:scale-[0.98]"
+                    }`}
+                  >
+                    {isActionDisabled ? (
+                      "OUT OF STOCK"
+                    ) : addedToCart ? (
+                      <>
+                        <CheckCircle2 size={20} /> ADDED TO CART
+                      </>
+                    ) : (
+                      <>
+                        <ShoppingCart size={18} strokeWidth={2} /> ADD TO CART
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleOpenEnquiryModal}
+                  className="flex-1 h-14 flex items-center justify-center gap-3 font-bold tracking-widest text-sm transition-all duration-300 bg-black text-white hover:bg-gray-900 active:scale-[0.98]"
+                >
+                  GET BEST PRICE
+                </button>
+              )}
 
               <button className="w-14 h-14 flex items-center justify-center border border-gray-200 hover:border-red-200 hover:text-red-500 transition-all bg-white group">
                 <Heart
@@ -582,26 +646,84 @@ export default function ProductDetails() {
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[var(--color-brand-border)] shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
           <button
-            onClick={handleAddToCart}
-            disabled={addedToCart || isOutOfStock}
+            onClick={isEnquiryOnly ? handleOpenEnquiryModal : handleAddToCart}
+            disabled={isEnquiryOnly ? false : addedToCart || isOutOfStock}
             className={`flex-1 h-14 font-bold tracking-widest text-sm transition-all ${
-              isOutOfStock
-                ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-                : addedToCart
-                ? "bg-green-600 text-white"
-                : "bg-[var(--color-brand-primary)] text-white hover:brightness-95"
+              isEnquiryOnly
+                ? "bg-black text-white hover:bg-gray-900"
+                : isOutOfStock
+                  ? "bg-gray-300 text-gray-600 cursor-not-allowed"
+                  : addedToCart
+                    ? "bg-green-600 text-white"
+                    : "bg-[var(--color-brand-primary)] text-white hover:brightness-95"
             }`}
           >
-            {isOutOfStock ? "OUT OF STOCK" : addedToCart ? "ADDED TO CART" : "ADD TO CART"}
+            {isEnquiryOnly ? "GET BEST PRICE" : isOutOfStock ? "OUT OF STOCK" : addedToCart ? "ADDED TO CART" : "ADD TO CART"}
           </button>
-          <Link
-            href="/cart"
-            className="flex-1 h-14 border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] text-sm tracking-widest font-bold flex items-center justify-center hover:bg-[var(--color-brand-primary)] hover:text-white transition-colors"
-          >
-            VIEW CART ({cartCount})
-          </Link>
+          {!isEnquiryOnly ? (
+            <Link
+              href="/cart"
+              className="flex-1 h-14 border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] text-sm tracking-widest font-bold flex items-center justify-center hover:bg-[var(--color-brand-primary)] hover:text-white transition-colors"
+            >
+              VIEW CART ({cartCount})
+            </Link>
+          ) : null}
         </div>
       </div>
+      {isEnquiryModalOpen ? (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md p-6 shadow-2xl">
+            <h3 className="text-lg font-serif text-gray-900 mb-4">Get Best Price</h3>
+            <p className="text-sm text-gray-600 mb-4">Enter your details and we will call you back.</p>
+            <div className="space-y-3">
+              <input
+                type="text"
+                placeholder="Enter your name"
+                value={enquiryName}
+                onChange={(event) => setEnquiryName(event.target.value)}
+                className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
+              />
+              <input
+                type="tel"
+                placeholder="Enter your phone number"
+                value={enquiryPhone}
+                onChange={(event) => setEnquiryPhone(event.target.value)}
+                className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[var(--color-brand-primary)]"
+              />
+              {enquiryError ? <p className="text-sm text-red-600">{enquiryError}</p> : null}
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setIsEnquiryModalOpen(false)}
+                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitEnquiry}
+                disabled={enquiryLoading}
+                className="px-4 py-2 text-sm bg-black text-white hover:bg-gray-900 disabled:opacity-60"
+              >
+                {enquiryLoading ? "Submitting..." : "Submit"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {isEnquirySuccessOpen ? (
+        <div className="fixed inset-0 z-[70] bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md p-6 shadow-2xl text-center">
+            <h3 className="text-lg font-serif text-gray-900 mb-3">Thanks for your enquiry</h3>
+            <p className="text-sm text-gray-700 mb-5">We will get back to you within 24 hours.</p>
+            <button
+              onClick={() => setIsEnquirySuccessOpen(false)}
+              className="px-5 py-2 text-sm bg-black text-white hover:bg-gray-900"
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -22,6 +22,9 @@ const calculateBilling = (items = [], productMap = new Map()) => {
     if (!product) {
       throw new Error(`Product not found for checkout item: ${productId}`);
     }
+    if (product.enquiryOnly) {
+      throw new Error(`${product.name} is available only for price enquiry and cannot be checked out.`);
+    }
 
     const selectedSize = typeof item.size === 'string' ? item.size.trim() : '';
     const matchedVariant = selectedSize
@@ -189,7 +192,7 @@ const createOrder = async (req, res) => {
       return res.status(400).json({ message: 'No valid items found for checkout. Please re-add products to cart and try again.' });
     }
 
-    const products = await Product.find({ $or: productFilters }).select('name price variants weightKg sku');
+    const products = await Product.find({ $or: productFilters }).select('name price variants weightKg sku enquiryOnly');
     const productMap = new Map();
     for (const product of products) {
       productMap.set(String(product._id), product);
