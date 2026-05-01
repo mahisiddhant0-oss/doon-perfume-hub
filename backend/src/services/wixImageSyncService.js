@@ -30,6 +30,35 @@ const inTargetFolder = (meta, folderHint) => {
   return pool.includes(target);
 };
 
+const categoryKey = (value = '') => normalize(value).replace(/[^a-z0-9]/g, '');
+
+const isEssentialOilProduct = (product) => {
+  const target = 'essentialoils';
+  const primary = categoryKey(product?.category || '');
+  const categories = Array.isArray(product?.categories)
+    ? product.categories.map((entry) => categoryKey(entry))
+    : [];
+  return primary === target || categories.includes(target);
+};
+
+const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+
+const upsert100mlVariantImage = (product, imageUrl) => {
+  const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+  const idx = variants.findIndex((variant) => normalizeLabel(variant?.label) === '100ml');
+  if (idx < 0) return false;
+
+  const current = String(variants[idx]?.image || '').trim();
+  if (current === imageUrl) return false;
+
+  variants[idx] = {
+    ...variants[idx],
+    image: imageUrl,
+  };
+  product.variants = variants;
+  return true;
+};
+
 const pickBestFileForProduct = (product, files, matchBy) => {
   const keys = buildMatchKeys(product, matchBy);
   if (keys.length === 0) return null;
@@ -57,6 +86,7 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
 
   let matched = 0;
   let updated = 0;
+  let updatedVariantImages = 0;
   const unmatchedProducts = [];
 
   for (const product of products) {
@@ -70,9 +100,20 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
     const nextImage = candidate.mediaUrl;
     const currentFirst = Array.isArray(product.images) && product.images.length > 0 ? String(product.images[0] || '') : '';
     const alreadyLinked = currentFirst === nextImage || (product.images || []).includes(nextImage);
-    if (alreadyLinked) continue;
+    let didUpdate = false;
+    if (!alreadyLinked) {
+      product.images = [nextImage];
+      didUpdate = true;
+    }
+    if (isEssentialOilProduct(product)) {
+      const variantUpdated = upsert100mlVariantImage(product, nextImage);
+      if (variantUpdated) {
+        updatedVariantImages += 1;
+        didUpdate = true;
+      }
+    }
+    if (!didUpdate) continue;
 
-    product.images = [nextImage];
     await product.save();
     updated += 1;
   }
@@ -84,6 +125,7 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
     wixFilesInFolder: wixFiles.length,
     matched,
     updated,
+    updatedVariantImages,
     unmatchedCount: unmatchedProducts.length,
     unmatchedPreview: unmatchedProducts.slice(0, 20),
     matchBy,
