@@ -72,7 +72,7 @@ productSchema.pre('validate', function syncCategoryFields() {
   }
 
   this.categories = uniqueCategories;
-  this.category = uniqueCategories[0] || normalizedPrimary || 'general';
+  this.category = uniqueCategories[0] || normalizedPrimary || 'perfumes';
 
 });
 

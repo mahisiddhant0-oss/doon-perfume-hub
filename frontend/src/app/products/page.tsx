@@ -41,9 +41,8 @@ const DEFAULT_CATEGORY_OPTIONS = [
   { label: 'Perfumes', value: 'perfumes' },
   { label: 'Essential Oils', value: 'essential-oils' },
   { label: 'Bottles', value: 'bottles' },
-  { label: 'General', value: 'general' },
 ];
-const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
+const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds', 'general']);
 const HIDDEN_FILTER_CATEGORY_VALUES = new Set(['all']);
 
 const MAX_SEARCH_INPUT_LENGTH = 2000;
@@ -82,7 +81,7 @@ function getPrimaryCategory(product: Product): string {
     const firstCategory = String(product.categories[0] || '').trim();
     if (firstCategory) return firstCategory;
   }
-  return String(product.category || 'general');
+  return String(product.category || 'perfumes');
 }
 
 function getProductCategories(product: Product): string[] {
@@ -101,11 +100,10 @@ function formatCategoryLabel(value: string) {
     perfumes: 'Perfumes',
     'essential-oils': 'Essential Oils',
     bottles: 'Bottles',
-    general: 'General',
   };
 
   const normalized = String(value || '').trim();
-  if (!normalized) return 'General';
+  if (!normalized) return 'Perfumes';
   if (knownLabels[normalized.toLowerCase()]) {
     return knownLabels[normalized.toLowerCase()];
   }
@@ -315,7 +313,6 @@ function ProductsPageContent() {
               <Link href="/products?category=perfumes" className="hover:text-[var(--color-brand-primary)] transition-colors">PERFUMES</Link>
               <Link href="/products?category=essential-oils" className="hover:text-[var(--color-brand-primary)] transition-colors">ESSENTIAL OILS</Link>
               <Link href="/products?category=bottles" className="hover:text-[var(--color-brand-primary)] transition-colors">BOTTLES</Link>
-              <Link href="/products?category=general" className="hover:text-[var(--color-brand-primary)] transition-colors">GENERAL</Link>
             </nav>
 
             <div className="flex items-center gap-6">
