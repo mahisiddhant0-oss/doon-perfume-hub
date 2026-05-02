@@ -6,7 +6,6 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { getJwtSecret } = require('../config/env');
 const { sendLoginOtpEmail } = require('../services/emailService');
-const { sendOTPSMS } = require('../services/smsService');
 
 // Generate custom JWT (Backend Authorization)
 const generateToken = (id) => {
@@ -293,12 +292,9 @@ const sendOtp = async (req, res) => {
 
     const emailResult = await sendLoginOtpEmail({ email, otp, name: user.name });
     if (emailResult?.error) {
-      const smsResult = await sendOTPSMS(phone, otp);
-      if (smsResult?.error) {
-        return res.status(502).json({
-          message: `Failed to send OTP. Email error: ${emailResult.error}. SMS error: ${smsResult.error}`,
-        });
-      }
+      return res.status(502).json({
+        message: `Failed to send OTP email: ${emailResult.error}`,
+      });
     }
 
     const payload = { message: 'OTP sent successfully', email, phone };
