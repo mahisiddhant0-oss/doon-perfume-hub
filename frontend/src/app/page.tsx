@@ -98,7 +98,7 @@ export default function Home() {
       titleAccent: 'Wellness',
       description:
         'Explore concentrated essential oils selected for aroma, quality, and consistency in every single drop.',
-      image: 'https://images.unsplash.com/photo-1611078489935-0cb964de46d6?w=2000&q=80',
+      image: '/hero-slide-3-custom.png',
       cta: 'SHOP ESSENTIAL OILS',
       href: '/products?category=essential-oils',
     },
@@ -640,9 +640,9 @@ export default function Home() {
          </div>
          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-4">
             {[
-              { name: 'Perfumes', img: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800&q=80', slug: 'perfumes' },
-              { name: 'Essential Oils', img: 'https://images.unsplash.com/photo-1627448839180-2647895400d3?w=800&q=80', slug: 'essential-oils' },
-              { name: 'Glass Bottles', img: 'https://images.unsplash.com/photo-1547887537-6158d64c35e3?w=800&q=80', slug: 'bottles' },
+            { name: 'Perfumes', img: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=800&q=80', slug: 'perfumes' },
+              { name: 'Essential Oils', img: '/home-essential-oils-lavender-v2.png', slug: 'essential-oils' },
+              { name: 'Glass Bottles', img: '/home-glass-bottles-rouge-v2.png', slug: 'bottles' },
             ].map((cat, i) => (
               <Link href={`/products?category=${cat.slug}`} key={i} className="group relative h-[500px] overflow-hidden flex items-end justify-center pb-12">
                  <Image src={cat.img} alt={cat.name} fill className="object-cover transition-transform duration-[3s] group-hover:scale-110" unoptimized />
