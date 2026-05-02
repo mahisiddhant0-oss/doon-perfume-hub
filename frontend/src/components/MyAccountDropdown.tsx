@@ -27,6 +27,12 @@ const readErrorMessage = async (res: Response, fallback: string) => {
   return payload?.message || fallback;
 };
 
+const withTimeoutSignal = (timeoutMs: number) => {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+  return { signal: controller.signal, timeoutId };
+};
+
 type MyAccountDropdownProps = {
   compact?: boolean;
 };
@@ -68,11 +74,18 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     try {
       const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
-      const res = await fetch(`${API_ROUTES.AUTH}/otp/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: apiEmail, phone: apiPhone }),
-      });
+      const { signal, timeoutId } = withTimeoutSignal(15000);
+      let res: Response;
+      try {
+        res = await fetch(`${API_ROUTES.AUTH}/otp/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal,
+          body: JSON.stringify({ email: apiEmail, phone: apiPhone }),
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
 
       if (!res.ok) {
         throw new Error(await readErrorMessage(res, 'Failed to send OTP'));
@@ -88,7 +101,11 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
         setDevOtp(data.devOtp);
       }
     } catch (requestError: any) {
-      setError(requestError.message || 'Failed to send OTP');
+      if (requestError?.name === 'AbortError') {
+        setError('OTP request timed out. Please try again.');
+      } else {
+        setError(requestError.message || 'Failed to send OTP');
+      }
     } finally {
       setLoading(false);
     }
@@ -102,11 +119,18 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     try {
       const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
-      const res = await fetch(`${API_ROUTES.AUTH}/otp/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: apiEmail, phone: apiPhone, otp }),
-      });
+      const { signal, timeoutId } = withTimeoutSignal(15000);
+      let res: Response;
+      try {
+        res = await fetch(`${API_ROUTES.AUTH}/otp/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal,
+          body: JSON.stringify({ email: apiEmail, phone: apiPhone, otp }),
+        });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
 
       if (!res.ok) {
         throw new Error(await readErrorMessage(res, 'Failed to verify OTP'));
@@ -122,7 +146,11 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
       setDevOtp('');
       autoVerifyLockRef.current = false;
     } catch (verifyError: any) {
-      setError(verifyError.message || 'Failed to verify OTP');
+      if (verifyError?.name === 'AbortError') {
+        setError('OTP verification timed out. Please try again.');
+      } else {
+        setError(verifyError.message || 'Failed to verify OTP');
+      }
       autoVerifyLockRef.current = false;
     } finally {
       setLoading(false);

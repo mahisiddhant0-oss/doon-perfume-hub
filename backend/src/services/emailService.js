@@ -19,6 +19,9 @@ const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
   port: process.env.SMTP_PORT || 587,
   secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
@@ -27,8 +30,6 @@ const transporter = nodemailer.createTransport({
 
 const isSmtpConfigured = () =>
   Boolean(
-    String(process.env.SMTP_HOST || '').trim() &&
-      String(process.env.SMTP_PORT || '').trim() &&
       String(process.env.SMTP_USER || '').trim() &&
       String(process.env.SMTP_PASS || '').trim()
   );
@@ -171,7 +172,7 @@ const sendAdminNewOrderAlert = async (order) => {
 const sendLoginOtpEmail = async ({ email, otp, name }) => {
   try {
     if (!isSmtpConfigured()) {
-      return { error: 'SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS.' };
+      return { error: 'SMTP is not configured. Set SMTP_USER and SMTP_PASS.' };
     }
 
     if (!email) {

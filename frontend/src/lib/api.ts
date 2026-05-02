@@ -6,10 +6,11 @@
 
 const normalizeBaseUrl = (value?: string) => value?.replace(/\/+$/, '') || '';
 const PRODUCTION_API_FALLBACK = 'https://api.doonperfumehub.com';
+const DEV_API_FALLBACK = 'http://localhost:5000';
 
 export const API_BASE =
   normalizeBaseUrl(process.env.NEXT_PUBLIC_API_URL) ||
-  (process.env.NODE_ENV === 'development' ? '' : PRODUCTION_API_FALLBACK);
+  (process.env.NODE_ENV === 'development' ? DEV_API_FALLBACK : PRODUCTION_API_FALLBACK);
 
 export const API_ROUTES = {
   AUTH: `${API_BASE}/api/auth`,
