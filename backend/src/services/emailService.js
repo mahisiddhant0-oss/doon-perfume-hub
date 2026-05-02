@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const dns = require('dns');
+const net = require('net');
 const emailNotificationsEnabled = String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
 
 try {
@@ -21,20 +22,38 @@ const resolveFromAddress = (fallbackLabel = 'DOON PERFUME HUB') => {
   return `"${fallbackLabel}" <${configured}>`;
 };
 
-// Setup SMTP transporter with environment variables
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
-  secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
-  family: 4,
-  connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-  greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-  socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const resolveSmtpHost = async () => {
+  const configuredHost = process.env.SMTP_HOST || 'smtp.gmail.com';
+  if (net.isIP(configuredHost)) {
+    return { host: configuredHost, servername: undefined };
+  }
+
+  try {
+    const { address } = await dns.promises.lookup(configuredHost, { family: 4 });
+    return { host: address, servername: configuredHost };
+  } catch {
+    return { host: configuredHost, servername: configuredHost };
+  }
+};
+
+const createSmtpTransporter = async () => {
+  const { host, servername } = await resolveSmtpHost();
+  const tls = servername ? { servername } : undefined;
+
+  return nodemailer.createTransport({
+    host,
+    port: process.env.SMTP_PORT || 587,
+    secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls,
+  });
+};
 
 const isSmtpConfigured = () =>
   Boolean(
@@ -137,6 +156,7 @@ const sendOrderConfirmation = async (order, userEmail) => {
       html: getOrderEmailTemplate(order, false),
     };
 
+    const transporter = await createSmtpTransporter();
     await transporter.sendMail(mailOptions);
     console.log('✉️ Order confirmation email sent to:', userEmail);
   } catch (error) {
@@ -167,6 +187,7 @@ const sendAdminNewOrderAlert = async (order) => {
       html: getOrderEmailTemplate(order, true),
     };
 
+    const transporter = await createSmtpTransporter();
     await transporter.sendMail(mailOptions);
     console.log('✉️ Admin order alert sent to:', adminEmail);
   } catch (error) {
@@ -202,6 +223,7 @@ const sendLoginOtpEmail = async ({ email, otp, name }) => {
       </div>
     `;
 
+    const transporter = await createSmtpTransporter();
     await transporter.sendMail({
       from: resolveFromAddress('DOON PERFUME HUB'),
       to: email,
@@ -240,6 +262,7 @@ const sendPriceEnquiryAlert = async ({ productName, sku, productId, customerName
     </div>
   `;
 
+  const transporter = await createSmtpTransporter();
   await transporter.sendMail({
     from: resolveFromAddress('DOON PERFUME HUB'),
     to: recipient,
