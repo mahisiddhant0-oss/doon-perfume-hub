@@ -55,6 +55,51 @@ const createSmtpTransporter = async () => {
   });
 };
 
+const createGmailSslTransporter = async () => {
+  const fallbackHost = 'smtp.gmail.com';
+  const { host, servername } = await (async () => {
+    try {
+      const { address } = await dns.promises.lookup(fallbackHost, { family: 4 });
+      return { host: address, servername: fallbackHost };
+    } catch {
+      return { host: fallbackHost, servername: fallbackHost };
+    }
+  })();
+
+  return nodemailer.createTransport({
+    host,
+    port: 465,
+    secure: true,
+    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
+    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
+    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: { servername },
+  });
+};
+
+const sendMailWithFallback = async (mailOptions) => {
+  try {
+    const transporter = await createSmtpTransporter();
+    return await transporter.sendMail(mailOptions);
+  } catch (error) {
+    const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').toLowerCase();
+    const shouldTryGmailSsl =
+      host.includes('gmail') &&
+      /timeout|etimedout|enetunreach|econnreset|econnrefused/i.test(String(error?.message || ''));
+
+    if (!shouldTryGmailSsl) {
+      throw error;
+    }
+
+    const fallbackTransporter = await createGmailSslTransporter();
+    return fallbackTransporter.sendMail(mailOptions);
+  }
+};
+
 const isSmtpConfigured = () =>
   Boolean(
       String(process.env.SMTP_USER || '').trim() &&
@@ -156,8 +201,7 @@ const sendOrderConfirmation = async (order, userEmail) => {
       html: getOrderEmailTemplate(order, false),
     };
 
-    const transporter = await createSmtpTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendMailWithFallback(mailOptions);
     console.log('✉️ Order confirmation email sent to:', userEmail);
   } catch (error) {
     console.error('❌ Error sending confirmation email:', error.message);
@@ -187,8 +231,7 @@ const sendAdminNewOrderAlert = async (order) => {
       html: getOrderEmailTemplate(order, true),
     };
 
-    const transporter = await createSmtpTransporter();
-    await transporter.sendMail(mailOptions);
+    await sendMailWithFallback(mailOptions);
     console.log('✉️ Admin order alert sent to:', adminEmail);
   } catch (error) {
     console.error('❌ Error sending admin notification email:', error.message);
@@ -223,8 +266,7 @@ const sendLoginOtpEmail = async ({ email, otp, name }) => {
       </div>
     `;
 
-    const transporter = await createSmtpTransporter();
-    await transporter.sendMail({
+    await sendMailWithFallback({
       from: resolveFromAddress('DOON PERFUME HUB'),
       to: email,
       subject: 'Your DOON PERFUME HUB Login OTP',
@@ -262,8 +304,7 @@ const sendPriceEnquiryAlert = async ({ productName, sku, productId, customerName
     </div>
   `;
 
-  const transporter = await createSmtpTransporter();
-  await transporter.sendMail({
+  await sendMailWithFallback({
     from: resolveFromAddress('DOON PERFUME HUB'),
     to: recipient,
     subject,
