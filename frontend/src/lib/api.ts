@@ -5,7 +5,7 @@
  */
 
 const normalizeBaseUrl = (value?: string) => value?.replace(/\/+$/, '') || '';
-const PRODUCTION_API_FALLBACK = 'https://api.doonperfumehub.com';
+const PRODUCTION_API_FALLBACK = 'https://doon-perfume-hub.onrender.com';
 const DEV_API_FALLBACK = 'http://localhost:5000';
 
 export const API_BASE =
