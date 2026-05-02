@@ -21,14 +21,14 @@ const resolveFromAddress = (fallbackLabel = 'DOON PERFUME HUB') => {
   return `"${fallbackLabel}" <${configured}>`;
 };
 
-const SMTP_CONNECTION_TIMEOUT_MS = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 8000);
-const SMTP_GREETING_TIMEOUT_MS = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 8000);
-const SMTP_SOCKET_TIMEOUT_MS = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 12000);
+const SMTP_CONNECTION_TIMEOUT_MS = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 5000);
+const SMTP_GREETING_TIMEOUT_MS = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 5000);
+const SMTP_SOCKET_TIMEOUT_MS = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 7000);
 
 const getSmtpCandidates = () => {
   const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim() || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT || 587);
-  const base = [{ host, port, secure: port === 465 }, { host, port: port === 465 ? 587 : 465, secure: port !== 465 }];
+  const base = [{ host, port, secure: port === 465 }];
 
   const dedup = [];
   const seen = new Set();

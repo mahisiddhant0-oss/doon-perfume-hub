@@ -74,7 +74,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     try {
       const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
-      const { signal, timeoutId } = withTimeoutSignal(15000);
+      const { signal, timeoutId } = withTimeoutSignal(25000);
       let res: Response;
       try {
         res = await fetch(`${API_ROUTES.AUTH}/otp/send`, {
@@ -119,7 +119,7 @@ export default function MyAccountDropdown({ compact = false }: MyAccountDropdown
     try {
       const apiEmail = normalizeEmailInput(email);
       const apiPhone = toApiPhone(phone);
-      const { signal, timeoutId } = withTimeoutSignal(15000);
+      const { signal, timeoutId } = withTimeoutSignal(25000);
       let res: Response;
       try {
         res = await fetch(`${API_ROUTES.AUTH}/otp/verify`, {
