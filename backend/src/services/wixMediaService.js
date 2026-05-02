@@ -28,10 +28,16 @@ const makeAuthVariants = () => {
     'Content-Type': 'application/json',
   };
 
+  // Wix API key calls should include either wix-site-id OR wix-account-id, not both.
+  const contextHeaders = siteId
+    ? { 'wix-site-id': siteId }
+    : accountId
+      ? { 'wix-account-id': accountId }
+      : {};
+
   const withContext = (headers) => ({
     ...headers,
-    ...(siteId ? { 'wix-site-id': siteId } : {}),
-    ...(accountId ? { 'wix-account-id': accountId } : {}),
+    ...contextHeaders,
   });
 
   return [
@@ -64,15 +70,11 @@ const queryWixFiles = async () => {
       url: `${WIX_API_BASE}/site-media/v1/files?limit=1000`,
       body: undefined,
     },
-    {
-      method: 'GET',
-      url: `${WIX_API_BASE}/media/v1/files?limit=1000`,
-      body: undefined,
-    },
   ];
 
   const authVariants = makeAuthVariants();
   let lastError = null;
+  const failures = [];
 
   for (const endpoint of endpoints) {
     for (const headers of authVariants) {
@@ -85,9 +87,9 @@ const queryWixFiles = async () => {
 
         if (!response.ok) {
           const text = await response.text().catch(() => '');
-          lastError = new Error(
-            `Wix media query failed (${response.status}) on ${endpoint.method} ${endpoint.url}: ${text || response.statusText}`
-          );
+          const failure = `(${response.status}) ${endpoint.method} ${endpoint.url}`;
+          failures.push(failure);
+          lastError = new Error(`Wix media query failed ${failure}: ${text || response.statusText}`);
           continue;
         }
 
@@ -102,7 +104,10 @@ const queryWixFiles = async () => {
     }
   }
 
-  throw lastError || new Error('Unable to query Wix media files');
+  if (lastError) {
+    throw new Error(`${lastError.message}${failures.length ? ` | attempts: ${failures.join(' ; ')}` : ''}`);
+  }
+  throw new Error('Unable to query Wix media files');
 };
 
 const extractFileMeta = (file = {}) => {
