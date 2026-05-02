@@ -28,7 +28,14 @@ const SMTP_SOCKET_TIMEOUT_MS = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 7000
 const getSmtpCandidates = () => {
   const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim() || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT || 587);
-  const base = [{ host, port, secure: port === 465 }];
+  const base = [
+    { host, port, secure: port === 465 },
+    // Gmail often works on 587 STARTTLS when 465 is throttled/blocked.
+    { host, port: 587, secure: false },
+    { host, port: 465, secure: true },
+    { host: 'smtp.gmail.com', port: 587, secure: false },
+    { host: 'smtp.gmail.com', port: 465, secure: true },
+  ];
 
   const dedup = [];
   const seen = new Set();
