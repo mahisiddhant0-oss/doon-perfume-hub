@@ -10,6 +10,7 @@ const Order = require('./models/Order');
 const Counter = require('./models/Counter');
 const { upsertSpecialEnquiryProducts } = require('./services/specialEnquiryProducts');
 const { ensureEssentialOil100mlVariants } = require('./services/essentialOilVariantService');
+const { syncProductImagesFromWix } = require('./services/wixImageSyncService');
 
 // Route Imports
 const authRoutes = require('./routes/authRoutes');
@@ -167,10 +168,24 @@ const syncEssentialOilVariants = async () => {
   }
 };
 
+const syncWixProductImages = async () => {
+  try {
+    if (mongoose.connection?.readyState !== 1) return;
+    const folder = String(process.env.WIX_MEDIA_FOLDER || '').trim() || '100 ML';
+    const result = await syncProductImagesFromWix({ folder, matchBy: 'name' });
+    console.log(
+      `Wix image sync completed. Matched ${result.matched}, Updated ${result.updated}, Variant images ${result.updatedVariantImages}, Folder ${result.folder || 'N/A'}`
+    );
+  } catch (error) {
+    console.error('Wix image sync failed:', error.message);
+  }
+};
+
 setTimeout(() => {
   reconcileOrderCodes();
   seedSpecialEnquiryCatalog();
   syncEssentialOilVariants();
+  syncWixProductImages();
 }, 5000);
 
 app.use('/api/auth', authRoutes);
