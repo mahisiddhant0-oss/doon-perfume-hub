@@ -44,8 +44,11 @@ const getSmtpCandidates = () => {
 
 const resolveHostForSmtp = async (host) => {
   try {
-    const result = await dns.promises.lookup(host, { family: 4 });
-    return { address: result.address, servername: host };
+    const addresses = await dns.promises.resolve4(host);
+    if (addresses && addresses.length > 0) {
+      return { address: addresses[0], servername: host };
+    }
+    return { address: host, servername: host };
   } catch {
     return { address: host, servername: host };
   }
