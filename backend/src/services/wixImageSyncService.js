@@ -68,11 +68,6 @@ const pickBestFileForProduct = (product, files, matchBy) => {
     if (keys.includes(file.normalizedName)) return file;
   }
 
-  for (const file of files) {
-    if (!file.mediaUrl || !file.normalizedName) continue;
-    if (keys.some((key) => file.normalizedName.includes(key) || key.includes(file.normalizedName))) return file;
-  }
-
   return null;
 };
 
@@ -82,14 +77,15 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
   const folderHint = folder || process.env.WIX_MEDIA_FOLDER || '';
   const wixFiles = mappedFiles.filter((file) => inTargetFolder(file, folderHint));
 
-  const products = await Product.find({ isActive: true }).select('_id name sku images');
+  const products = await Product.find({ isActive: true }).select('_id name sku category categories images variants');
+  const essentialOilProducts = products.filter(isEssentialOilProduct);
 
   let matched = 0;
   let updated = 0;
   let updatedVariantImages = 0;
   const unmatchedProducts = [];
 
-  for (const product of products) {
+  for (const product of essentialOilProducts) {
     const candidate = pickBestFileForProduct(product, wixFiles, matchBy);
     if (!candidate) {
       unmatchedProducts.push({ id: product._id, name: product.name, sku: product.sku || '' });
@@ -105,12 +101,10 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
       product.images = [nextImage];
       didUpdate = true;
     }
-    if (isEssentialOilProduct(product)) {
-      const variantUpdated = upsert100mlVariantImage(product, nextImage);
-      if (variantUpdated) {
-        updatedVariantImages += 1;
-        didUpdate = true;
-      }
+    const variantUpdated = upsert100mlVariantImage(product, nextImage);
+    if (variantUpdated) {
+      updatedVariantImages += 1;
+      didUpdate = true;
     }
     if (!didUpdate) continue;
 
@@ -121,6 +115,7 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
   return {
     folder: folderHint || null,
     totalProducts: products.length,
+    essentialOilProducts: essentialOilProducts.length,
     wixFilesScanned: mappedFiles.length,
     wixFilesInFolder: wixFiles.length,
     matched,
