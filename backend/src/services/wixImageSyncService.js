@@ -23,7 +23,19 @@ const buildMatchKeys = (product, matchBy = 'name') => {
 const inTargetFolder = (meta, folderHint) => {
   if (!folderHint) return true;
   const target = normalize(folderHint);
-  const pool = [meta.parentFolderName, meta.parentFolderId, meta.raw?.path, meta.raw?.displayName, meta.raw?.name]
+  const pool = [
+    meta.parentFolderName,
+    meta.parentFolderId,
+    meta.raw?.path,
+    meta.raw?.displayName,
+    meta.raw?.name,
+    meta.raw?.folderPath,
+    meta.raw?.folderName,
+    meta.raw?.parentFolder?.name,
+    meta.raw?.parentFolder?.path,
+    meta.raw?.folder?.name,
+    meta.raw?.folder?.path,
+  ]
     .map((entry) => normalize(entry))
     .filter(Boolean)
     .join(' ');
@@ -68,6 +80,18 @@ const pickBestFileForProduct = (product, files, matchBy) => {
     if (keys.includes(file.normalizedName)) return file;
   }
 
+  // Fallback: match when all words of a key are present in the filename.
+  for (const file of files) {
+    if (!file.mediaUrl || !file.normalizedName) continue;
+    const fileTokens = new Set(file.normalizedName.split(' ').filter(Boolean));
+    for (const key of keys) {
+      const keyTokens = key.split(' ').filter(Boolean);
+      if (keyTokens.length === 0) continue;
+      const allPresent = keyTokens.every((token) => fileTokens.has(token));
+      if (allPresent) return file;
+    }
+  }
+
   return null;
 };
 
@@ -75,7 +99,9 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
   const wixFilesRaw = await queryWixFiles();
   const mappedFiles = wixFilesRaw.map(extractFileMeta);
   const folderHint = folder || process.env.WIX_MEDIA_FOLDER || '';
-  const wixFiles = mappedFiles.filter((file) => inTargetFolder(file, folderHint));
+  const wixFilesByFolder = mappedFiles.filter((file) => inTargetFolder(file, folderHint));
+  const wixFiles = wixFilesByFolder.length > 0 ? wixFilesByFolder : mappedFiles;
+  const folderFilterBypassed = Boolean(folderHint) && wixFilesByFolder.length === 0;
 
   const products = await Product.find({ isActive: true }).select('_id name sku category categories images variants');
   const essentialOilProducts = products.filter(isEssentialOilProduct);
@@ -84,6 +110,7 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
   let updated = 0;
   let updatedVariantImages = 0;
   const unmatchedProducts = [];
+  const matchedPreview = [];
 
   for (const product of essentialOilProducts) {
     const candidate = pickBestFileForProduct(product, wixFiles, matchBy);
@@ -94,6 +121,14 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
 
     matched += 1;
     const nextImage = candidate.mediaUrl;
+    if (matchedPreview.length < 25) {
+      matchedPreview.push({
+        product: product.name,
+        sku: product.sku || '',
+        fileName: candidate.name || '',
+        imageUrl: nextImage,
+      });
+    }
     const currentFirst = Array.isArray(product.images) && product.images.length > 0 ? String(product.images[0] || '') : '';
     const alreadyLinked = currentFirst === nextImage || (product.images || []).includes(nextImage);
     let didUpdate = false;
@@ -117,12 +152,15 @@ const syncProductImagesFromWix = async ({ folder, matchBy = 'name' } = {}) => {
     totalProducts: products.length,
     essentialOilProducts: essentialOilProducts.length,
     wixFilesScanned: mappedFiles.length,
-    wixFilesInFolder: wixFiles.length,
+    wixFilesInFolder: wixFilesByFolder.length,
+    wixFilesUsedForMatching: wixFiles.length,
+    folderFilterBypassed,
     matched,
     updated,
     updatedVariantImages,
     unmatchedCount: unmatchedProducts.length,
     unmatchedPreview: unmatchedProducts.slice(0, 20),
+    matchedPreview,
     matchBy,
   };
 };
