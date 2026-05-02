@@ -1,7 +1,5 @@
 const nodemailer = require('nodemailer');
 const dns = require('dns');
-const net = require('net');
-const https = require('https');
 const emailNotificationsEnabled = String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
 
 try {
@@ -23,82 +21,67 @@ const resolveFromAddress = (fallbackLabel = 'DOON PERFUME HUB') => {
   return `"${fallbackLabel}" <${configured}>`;
 };
 
-const resolveSmtpHost = async () => {
-  const configuredHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-  if (net.isIP(configuredHost)) {
-    return { host: configuredHost, servername: undefined };
+const SMTP_CONNECTION_TIMEOUT_MS = Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 20000);
+const SMTP_GREETING_TIMEOUT_MS = Number(process.env.SMTP_GREETING_TIMEOUT_MS || 20000);
+const SMTP_SOCKET_TIMEOUT_MS = Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 30000);
+
+const getSmtpCandidates = () => {
+  const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').trim() || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const base = [{ host, port, secure: port === 465 }];
+
+  // Gmail-specific fallbacks for flaky egress routing
+  if (/gmail|google/i.test(host)) {
+    base.push(
+      { host: 'smtp.gmail.com', port: 587, secure: false },
+      { host: 'smtp.gmail.com', port: 465, secure: true },
+      { host: 'gmail-smtp-msa.l.google.com', port: 587, secure: false },
+      { host: 'gmail-smtp-msa.l.google.com', port: 465, secure: true }
+    );
   }
 
-  try {
-    const { address } = await dns.promises.lookup(configuredHost, { family: 4 });
-    return { host: address, servername: configuredHost };
-  } catch {
-    return { host: configuredHost, servername: configuredHost };
-  }
-};
-
-const createSmtpTransporter = async () => {
-  const { host, servername } = await resolveSmtpHost();
-  const tls = servername ? { servername } : undefined;
-
-  return nodemailer.createTransport({
-    host,
-    port: process.env.SMTP_PORT || 587,
-    secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
-    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    tls,
-  });
-};
-
-const createGmailSslTransporter = async () => {
-  const fallbackHost = 'smtp.gmail.com';
-  const { host, servername } = await (async () => {
-    try {
-      const { address } = await dns.promises.lookup(fallbackHost, { family: 4 });
-      return { host: address, servername: fallbackHost };
-    } catch {
-      return { host: fallbackHost, servername: fallbackHost };
+  const dedup = [];
+  const seen = new Set();
+  for (const item of base) {
+    const key = `${item.host}:${item.port}:${item.secure}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      dedup.push(item);
     }
-  })();
+  }
+  return dedup;
+};
 
-  return nodemailer.createTransport({
+const createSmtpTransporter = ({ host, port, secure }) =>
+  nodemailer.createTransport({
     host,
-    port: 465,
-    secure: true,
-    connectionTimeout: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS || 10000),
-    greetingTimeout: Number(process.env.SMTP_GREETING_TIMEOUT_MS || 10000),
-    socketTimeout: Number(process.env.SMTP_SOCKET_TIMEOUT_MS || 15000),
+    port,
+    secure,
+    requireTLS: !secure,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    tls: { servername },
+    tls: { servername: host },
   });
-};
 
 const sendMailWithFallback = async (mailOptions) => {
-  try {
-    const transporter = await createSmtpTransporter();
-    return await transporter.sendMail(mailOptions);
-  } catch (error) {
-    const host = String(process.env.SMTP_HOST || 'smtp.gmail.com').toLowerCase();
-    const shouldTryGmailSsl =
-      host.includes('gmail') &&
-      /timeout|etimedout|enetunreach|econnreset|econnrefused/i.test(String(error?.message || ''));
+  const candidates = getSmtpCandidates();
+  const errors = [];
 
-    if (!shouldTryGmailSsl) {
-      throw error;
+  for (const candidate of candidates) {
+    try {
+      const transporter = createSmtpTransporter(candidate);
+      return await transporter.sendMail(mailOptions);
+    } catch (error) {
+      errors.push(`${candidate.host}:${candidate.port} ${error.message}`);
     }
-
-    const fallbackTransporter = await createGmailSslTransporter();
-    return fallbackTransporter.sendMail(mailOptions);
   }
+
+  throw new Error(errors.join(' | '));
 };
 
 const isSmtpConfigured = () =>
@@ -106,71 +89,6 @@ const isSmtpConfigured = () =>
       String(process.env.SMTP_USER || '').trim() &&
       String(process.env.SMTP_PASS || '').trim()
   );
-
-const getResendApiKey = () => String(process.env.RESEND_API_KEY || '').trim();
-const getResendFromEmail = () =>
-  String(process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || '').trim();
-
-const sendMailViaResend = ({ to, subject, html }) =>
-  new Promise((resolve, reject) => {
-    const apiKey = getResendApiKey();
-    const from = getResendFromEmail();
-
-    if (!apiKey) {
-      reject(new Error('RESEND_API_KEY is not configured.'));
-      return;
-    }
-
-    if (!from) {
-      reject(new Error('RESEND_FROM_EMAIL (or SMTP_FROM_EMAIL) is not configured.'));
-      return;
-    }
-
-    const payload = JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      html,
-    });
-
-    const req = https.request(
-      {
-        hostname: 'api.resend.com',
-        path: '/emails',
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload),
-        },
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => {
-          body += chunk;
-        });
-        res.on('end', () => {
-          let parsed = {};
-          try {
-            parsed = JSON.parse(body || '{}');
-          } catch {
-            parsed = { raw: body };
-          }
-
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(parsed);
-            return;
-          }
-
-          reject(new Error(parsed?.message || parsed?.error || parsed?.raw || `Resend failed (${res.statusCode})`));
-        });
-      }
-    );
-
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
-  });
 
 /**
  * @desc    Generate professional HTML template for order confirmation
@@ -329,15 +247,6 @@ const sendLoginOtpEmail = async ({ email, otp, name }) => {
     `;
 
     const subject = 'Your DOON PERFUME HUB Login OTP';
-
-    try {
-      await sendMailViaResend({ to: email, subject, html });
-      return { success: true };
-    } catch (resendError) {
-      if (!isSmtpConfigured()) {
-        return { error: resendError.message || 'Failed to send OTP email via Resend' };
-      }
-    }
 
     await sendMailWithFallback({
       from: resolveFromAddress('DOON PERFUME HUB'),
