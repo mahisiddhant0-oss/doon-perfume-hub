@@ -1,5 +1,12 @@
 const nodemailer = require('nodemailer');
+const dns = require('dns');
 const emailNotificationsEnabled = String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
+
+try {
+  dns.setDefaultResultOrder('ipv4first');
+} catch (_) {
+  // Ignore when runtime doesn't support this API.
+}
 
 const resolveFromAddress = (fallbackLabel = 'DOON PERFUME HUB') => {
   const configured = String(process.env.SMTP_FROM_EMAIL || '').trim();
