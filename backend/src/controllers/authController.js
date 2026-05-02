@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const { getJwtSecret } = require('../config/env');
 const { sendLoginOtpEmail } = require('../services/emailService');
+const { sendOTPSMS } = require('../services/smsService');
 
 // Generate custom JWT (Backend Authorization)
 const generateToken = (id) => {
@@ -290,9 +291,22 @@ const sendOtp = async (req, res) => {
       return res.status(403).json({ message: 'Your account is blocked. Please contact support.' });
     }
 
-    const emailResult = await sendLoginOtpEmail({ email, otp, name: user.name });
-    if (emailResult?.error) {
-      return res.status(502).json({ message: `Failed to send OTP email: ${emailResult.error}` });
+    const [emailResult, smsResult] = await Promise.allSettled([
+      sendLoginOtpEmail({ email, otp, name: user.name }),
+      sendOTPSMS(phone, otp),
+    ]);
+
+    const emailError =
+      emailResult.status === 'fulfilled' ? emailResult.value?.error : emailResult.reason?.message;
+    const smsError =
+      smsResult.status === 'fulfilled' ? smsResult.value?.error : smsResult.reason?.message;
+    const otpDelivered = !emailError || !smsError;
+
+    if (!otpDelivered) {
+      const failures = [emailError && `email: ${emailError}`, smsError && `sms: ${smsError}`]
+        .filter(Boolean)
+        .join(' | ');
+      return res.status(502).json({ message: `Failed to send OTP (${failures})` });
     }
 
     const payload = { message: 'OTP sent successfully', email, phone };
