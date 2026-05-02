@@ -24,6 +24,14 @@ const formatCategoryName = (value = '') =>
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (char) => char.toUpperCase());
 
+const normalizeNameKey = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/\s+essential\s+oil$/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
 const normalizeCategories = (category, categories) => {
   const fromArray = Array.isArray(categories)
     ? categories.map((entry) => String(entry || '').trim())
@@ -542,6 +550,90 @@ const syncEssentialOil100mlVariants = async (req, res) => {
   }
 };
 
+// @desc    Apply manual image mappings to essential-oil products by name
+// @route   POST /api/products/admin/map-essential-oil-images
+// @access  Private/Admin
+const mapEssentialOilImages = async (req, res) => {
+  try {
+    const mappings = Array.isArray(req.body?.mappings) ? req.body.mappings : [];
+    if (mappings.length === 0) {
+      return res.status(400).json({ message: 'mappings array is required' });
+    }
+
+    const normalizedMappings = mappings
+      .map((entry) => ({
+        name: String(entry?.name || '').trim(),
+        key: normalizeNameKey(entry?.name || ''),
+        imageUrl: String(entry?.imageUrl || '').trim(),
+      }))
+      .filter((entry) => entry.key && /^https?:\/\//i.test(entry.imageUrl));
+
+    if (normalizedMappings.length === 0) {
+      return res.status(400).json({ message: 'No valid mappings found (name + imageUrl required)' });
+    }
+
+    const products = await Product.find({ isActive: true }).select('name category categories images variants');
+    let updatedProducts = 0;
+    const applied = [];
+    const notFound = [];
+
+    for (const mapping of normalizedMappings) {
+      const product = products.find((item) => {
+        const primary = String(item.category || '').toLowerCase();
+        const categories = Array.isArray(item.categories)
+          ? item.categories.map((entry) => String(entry || '').toLowerCase())
+          : [];
+        const isEssentialOil = primary === 'essential-oils' || categories.includes('essential-oils');
+        if (!isEssentialOil) return false;
+        return normalizeNameKey(item.name) === mapping.key;
+      });
+
+      if (!product) {
+        notFound.push(mapping.name);
+        continue;
+      }
+
+      let didChange = false;
+      const currentFirstImage = Array.isArray(product.images) && product.images.length > 0 ? String(product.images[0] || '') : '';
+      if (currentFirstImage !== mapping.imageUrl) {
+        product.images = [mapping.imageUrl];
+        didChange = true;
+      }
+
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      const vIndex = variants.findIndex((variant) => String(variant?.label || '').trim().toLowerCase() === '100ml');
+      if (vIndex >= 0 && String(variants[vIndex]?.image || '').trim() !== mapping.imageUrl) {
+        variants[vIndex] = { ...variants[vIndex], image: mapping.imageUrl };
+        product.variants = variants;
+        didChange = true;
+      }
+
+      if (didChange) {
+        await product.save();
+        updatedProducts += 1;
+      }
+
+      applied.push({
+        mappingName: mapping.name,
+        productName: product.name,
+        imageUrl: mapping.imageUrl,
+        updated: didChange,
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Manual essential-oil image mapping completed',
+      requestedMappings: mappings.length,
+      validMappings: normalizedMappings.length,
+      updatedProducts,
+      applied,
+      notFound,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Manual image mapping failed', error: error.message });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -556,4 +648,5 @@ module.exports = {
   submitProductEnquiry,
   syncWixImages,
   syncEssentialOil100mlVariants,
+  mapEssentialOilImages,
 };
