@@ -1,6 +1,7 @@
 const nodemailer = require('nodemailer');
 const dns = require('dns');
 const net = require('net');
+const https = require('https');
 const emailNotificationsEnabled = String(process.env.EMAIL_NOTIFICATIONS_ENABLED || '').toLowerCase() === 'true';
 
 try {
@@ -105,6 +106,71 @@ const isSmtpConfigured = () =>
       String(process.env.SMTP_USER || '').trim() &&
       String(process.env.SMTP_PASS || '').trim()
   );
+
+const getResendApiKey = () => String(process.env.RESEND_API_KEY || '').trim();
+const getResendFromEmail = () =>
+  String(process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || '').trim();
+
+const sendMailViaResend = ({ to, subject, html }) =>
+  new Promise((resolve, reject) => {
+    const apiKey = getResendApiKey();
+    const from = getResendFromEmail();
+
+    if (!apiKey) {
+      reject(new Error('RESEND_API_KEY is not configured.'));
+      return;
+    }
+
+    if (!from) {
+      reject(new Error('RESEND_FROM_EMAIL (or SMTP_FROM_EMAIL) is not configured.'));
+      return;
+    }
+
+    const payload = JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html,
+    });
+
+    const req = https.request(
+      {
+        hostname: 'api.resend.com',
+        path: '/emails',
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+        },
+      },
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => {
+          body += chunk;
+        });
+        res.on('end', () => {
+          let parsed = {};
+          try {
+            parsed = JSON.parse(body || '{}');
+          } catch {
+            parsed = { raw: body };
+          }
+
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(parsed);
+            return;
+          }
+
+          reject(new Error(parsed?.message || parsed?.error || parsed?.raw || `Resend failed (${res.statusCode})`));
+        });
+      }
+    );
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
 
 /**
  * @desc    Generate professional HTML template for order confirmation
@@ -243,10 +309,6 @@ const sendAdminNewOrderAlert = async (order) => {
  */
 const sendLoginOtpEmail = async ({ email, otp, name }) => {
   try {
-    if (!isSmtpConfigured()) {
-      return { error: 'SMTP is not configured. Set SMTP_USER and SMTP_PASS.' };
-    }
-
     if (!email) {
       return { error: 'Email is required for OTP delivery.' };
     }
@@ -266,10 +328,21 @@ const sendLoginOtpEmail = async ({ email, otp, name }) => {
       </div>
     `;
 
+    const subject = 'Your DOON PERFUME HUB Login OTP';
+
+    try {
+      await sendMailViaResend({ to: email, subject, html });
+      return { success: true };
+    } catch (resendError) {
+      if (!isSmtpConfigured()) {
+        return { error: resendError.message || 'Failed to send OTP email via Resend' };
+      }
+    }
+
     await sendMailWithFallback({
       from: resolveFromAddress('DOON PERFUME HUB'),
       to: email,
-      subject: 'Your DOON PERFUME HUB Login OTP',
+      subject,
       html,
     });
 
