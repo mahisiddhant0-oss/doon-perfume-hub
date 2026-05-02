@@ -42,9 +42,19 @@ const getSmtpCandidates = () => {
   return dedup;
 };
 
-const createSmtpTransporter = ({ host, port, secure }) =>
-  nodemailer.createTransport({
-    host,
+const resolveHostForSmtp = async (host) => {
+  try {
+    const result = await dns.promises.lookup(host, { family: 4 });
+    return { address: result.address, servername: host };
+  } catch {
+    return { address: host, servername: host };
+  }
+};
+
+const createSmtpTransporter = async ({ host, port, secure }) => {
+  const { address, servername } = await resolveHostForSmtp(host);
+  return nodemailer.createTransport({
+    host: address,
     port,
     secure,
     requireTLS: !secure,
@@ -55,8 +65,9 @@ const createSmtpTransporter = ({ host, port, secure }) =>
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
-    tls: { servername: host },
+    tls: { servername },
   });
+};
 
 const sendMailWithFallback = async (mailOptions) => {
   const candidates = getSmtpCandidates();
@@ -64,7 +75,7 @@ const sendMailWithFallback = async (mailOptions) => {
 
   for (const candidate of candidates) {
     try {
-      const transporter = createSmtpTransporter(candidate);
+      const transporter = await createSmtpTransporter(candidate);
       return await transporter.sendMail(mailOptions);
     } catch (error) {
       errors.push(`${candidate.host}:${candidate.port} ${error.message}`);
