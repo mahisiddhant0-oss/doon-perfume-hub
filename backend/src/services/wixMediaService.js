@@ -47,14 +47,29 @@ const queryWixFiles = async () => {
     throw new Error('WIX_API_KEY is not configured');
   }
 
-  const endpoints = [`${WIX_API_BASE}/site-media/v1/files/query`, `${WIX_API_BASE}/media/v1/files/query`];
-  const body = JSON.stringify({
-    query: {
-      paging: {
-        limit: 1000,
-      },
+  const endpoints = [
+    {
+      method: 'POST',
+      url: `${WIX_API_BASE}/site-media/v1/files/search`,
+      body: JSON.stringify({
+        query: {
+          paging: {
+            limit: 200,
+          },
+        },
+      }),
     },
-  });
+    {
+      method: 'GET',
+      url: `${WIX_API_BASE}/site-media/v1/files?limit=1000`,
+      body: undefined,
+    },
+    {
+      method: 'GET',
+      url: `${WIX_API_BASE}/media/v1/files?limit=1000`,
+      body: undefined,
+    },
+  ];
 
   const authVariants = makeAuthVariants();
   let lastError = null;
@@ -62,15 +77,17 @@ const queryWixFiles = async () => {
   for (const endpoint of endpoints) {
     for (const headers of authVariants) {
       try {
-        const response = await fetch(endpoint, {
-          method: 'POST',
+        const response = await fetch(endpoint.url, {
+          method: endpoint.method,
           headers,
-          body,
+          ...(endpoint.body ? { body: endpoint.body } : {}),
         });
 
         if (!response.ok) {
           const text = await response.text().catch(() => '');
-          lastError = new Error(`Wix media query failed (${response.status}): ${text || response.statusText}`);
+          lastError = new Error(
+            `Wix media query failed (${response.status}) on ${endpoint.method} ${endpoint.url}: ${text || response.statusText}`
+          );
           continue;
         }
 
