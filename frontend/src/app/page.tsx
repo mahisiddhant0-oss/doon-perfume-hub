@@ -185,11 +185,11 @@ export default function Home() {
       return categoriesForProduct.includes('essential-oils');
     });
 
-    const byName = new Map(oils.map((product) => [normalizeProductName(product.name), product]));
+    const byNameAll = new Map(allProducts.map((product) => [normalizeProductName(product.name), product]));
     const picked: Product[] = [];
 
     preferredOrder.forEach((name) => {
-      const match = byName.get(name);
+      const match = byNameAll.get(name);
       if (match) picked.push(match);
     });
 
