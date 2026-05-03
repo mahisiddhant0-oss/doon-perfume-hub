@@ -160,6 +160,16 @@ export default function Home() {
     return columns;
   }, [categories]);
 
+  const givaudanEssentialOils = useMemo(() => {
+    const oils = allProducts.filter((product) => {
+      const categoriesForProduct = getProductCategories(product).map((entry) =>
+        String(entry || '').trim().toLowerCase()
+      );
+      return categoriesForProduct.includes('essential-oils');
+    });
+    return oils.slice(0, 8);
+  }, [allProducts]);
+
   const handleCategoryRailMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     const rail = event.currentTarget;
     rail.dataset.dragging = 'true';
@@ -654,6 +664,60 @@ export default function Home() {
               </Link>
             ))}
          </div>
+      </section>
+
+      <section className="py-16 md:py-24 bg-[var(--color-brand-bg)] border-t border-[var(--color-brand-border)]">
+        <div className="max-w-7xl mx-auto px-4 md:px-8">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10 md:mb-14">
+            <div>
+              <p className="text-[10px] md:text-xs font-bold tracking-[0.28em] text-[var(--color-brand-primary)] uppercase mb-3">
+                Premium Partner Showcase
+              </p>
+              <h2 className="text-3xl md:text-5xl font-serif text-[var(--color-brand-text)] leading-tight">
+                Givaudan Essential Oils
+              </h2>
+              <p className="text-gray-500 mt-3 max-w-2xl text-sm md:text-base leading-relaxed">
+                Explore a curated range of premium essential oils inspired by global fragrance standards and crafted for consistent aroma quality.
+              </p>
+            </div>
+            <div className="bg-white border border-[var(--color-brand-border)] px-5 py-4 w-fit shadow-sm">
+              <Image
+                src="/givaudan-logo.svg"
+                alt="Givaudan"
+                width={170}
+                height={88}
+                className="h-auto w-[130px] md:w-[170px] object-contain"
+                unoptimized
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {givaudanEssentialOils.map((item) => (
+              <Link
+                href={`/products/${item._id}`}
+                key={`givaudan-oil-${item._id}`}
+                className="group bg-white border border-[var(--color-brand-border)] overflow-hidden hover:shadow-xl transition-all duration-500"
+              >
+                <div className="relative aspect-[4/5] overflow-hidden">
+                  <Image
+                    src={item.images?.[0] || DEFAULT_IMAGE}
+                    alt={item.name}
+                    fill
+                    className="object-cover group-hover:scale-110 transition-transform duration-700"
+                    unoptimized
+                  />
+                </div>
+                <div className="p-3 md:p-4">
+                  <p className="text-[9px] md:text-[10px] font-bold tracking-[0.24em] text-[var(--color-brand-primary)] uppercase mb-1">
+                    Essential Oils
+                  </p>
+                  <h3 className="font-serif text-sm md:text-lg text-gray-900 line-clamp-2">{item.name}</h3>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
       </section>
 
     </div>
