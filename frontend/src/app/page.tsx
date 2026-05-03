@@ -482,7 +482,7 @@ export default function Home() {
       </section>
 
       {/* Category Nav Row - Jewelry Style */}
-      <section className="py-12 md:py-20 bg-white">
+      <section className="pt-12 pb-6 md:pt-20 md:pb-10 bg-white">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="hidden md:block text-center mb-10 md:mb-14">
             <h2 className="text-2xl md:text-3xl font-serif text-gray-800 mb-2">Shop By Category</h2>
@@ -609,7 +609,7 @@ export default function Home() {
       </section>
 
       {/* Latest Products Section */}
-      <section className="py-12 md:py-32 max-w-7xl mx-auto px-4 md:px-8">
+      <section className="pt-6 pb-12 md:pt-10 md:pb-24 max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 md:mb-16 gap-4">
             <div className="max-w-xl text-left">
                 <h2 className="text-3xl md:text-6xl font-serif text-[var(--color-brand-text)] mb-3">Latest Viral <br /><span className="italic text-[var(--color-brand-primary)]">Launches</span></h2>
