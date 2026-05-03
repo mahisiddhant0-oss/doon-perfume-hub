@@ -492,11 +492,13 @@ export default function ProductDetails() {
             </nav>
 
             <div className="flex items-center gap-5 text-gray-700">
-              <Search
-                size={20}
-                strokeWidth={1.7}
-                className="cursor-pointer hover:text-[var(--color-brand-primary)]"
-              />
+              <Link href="/products" className="hover:text-[var(--color-brand-primary)]" aria-label="Go to products">
+                <Search
+                  size={20}
+                  strokeWidth={1.7}
+                  className="cursor-pointer"
+                />
+              </Link>
               <div className="hidden sm:block">
                 <MyAccountDropdown />
               </div>
