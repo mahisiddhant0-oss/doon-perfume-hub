@@ -687,6 +687,108 @@ const setStandardVariantWeights = async (req, res) => {
   }
 };
 
+// @desc    Add/update 250ml variants for selected essential oils and set all variant stocks to 50
+// @route   POST /api/products/admin/sync-selected-essential-oils-250ml
+// @access  Private/Admin
+const syncSelectedEssentialOils250ml = async (req, res) => {
+  try {
+    const TARGET_PRODUCTS = [
+      'OUD FOREST', 'ROSE AGRA 9624', 'DOWNTOWN TOM', 'VIKING', 'GLORIA',
+      'COOL DRIFT', 'DARK COUNTY', 'WHITE DESERT', 'ARABIAN SONG', 'VELVET CREPE',
+      'PHULORA', 'KESARI CHANDAN', 'NOBLE OUD', 'MAJESTIC EAGLE', 'ARABIAN MIRAGE',
+      'SAFFRON BLISS', 'AMBER DREAMS', 'OUD GLORY', 'ROYAL WOODS', 'WILD BOULEVARD',
+      'DARING AVENUE', 'FURIOUS FLARE', 'UNIVERSAL POWER', 'STONEWOOD', 'PURPLE SPORT',
+      'MOST DESIRED', 'CREATIVE IMPACT', 'ADVENTURE TRAILS', 'SAVAGE FIRE', 'LOUVRE MAGIC',
+      'PARISIAN LANES', 'LIBERATED GIRL', 'AIR DRONE', 'ERASURE FRESH', 'HER HIGHNESS',
+      'LADY MACBETH', 'DUSKLINE', 'BLACK VELVET', 'IMAGINE STARS', 'ARABIC LURE',
+      'AFGHAN TIGER', 'GYPSY TRAIL', 'RED DIAMOND', 'ORCHID SUNSET', 'AMBERY NIGHTS',
+      'SANDAL WOOD', 'CHANDAN PURE', 'PURE GEELI MITTI', 'ARABIAN HONEY',
+    ];
+
+    const normalizeNameKey = (value = '') =>
+      String(value || '')
+        .toUpperCase()
+        .replace(/\s+ESSENTIAL\s+OIL$/i, '')
+        .replace(/[^A-Z0-9]+/g, ' ')
+        .trim();
+    const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const getVariant = (variants, label) =>
+      Array.isArray(variants)
+        ? variants.find((variant) => normalizeLabel(variant?.label) === normalizeLabel(label)) || null
+        : null;
+    const isEssentialOil = (product) => {
+      const category = String(product?.category || '').toLowerCase();
+      const categories = Array.isArray(product?.categories) ? product.categories.map((entry) => String(entry || '').toLowerCase()) : [];
+      return category === 'essential-oils' || categories.includes('essential-oils');
+    };
+
+    const targetSet = new Set(TARGET_PRODUCTS.map(normalizeNameKey));
+    const products = await Product.find({ isActive: true }).select('name category categories variants');
+    const candidates = products.filter((product) => isEssentialOil(product) && targetSet.has(normalizeNameKey(product.name)));
+
+    let updated = 0;
+    const skippedNo100ml = [];
+
+    for (const product of candidates) {
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      const variant100ml = getVariant(variants, '100ml');
+
+      if (!variant100ml || !Number.isFinite(Number(variant100ml.price))) {
+        skippedNo100ml.push(product.name);
+        continue;
+      }
+
+      const variant250Price = Math.round(Number(variant100ml.price) * 2 + 75);
+      const current250 = getVariant(variants, '250ml');
+      const weightFrom100 = Number.isFinite(Number(variant100ml.weight)) ? Number(variant100ml.weight) : 1;
+
+      const nextVariants = variants.map((variant) => ({
+        ...variant.toObject?.(),
+        stock: 50,
+      }));
+
+      if (current250) {
+        const idx = nextVariants.findIndex((variant) => normalizeLabel(variant?.label) === '250ml');
+        nextVariants[idx] = {
+          ...nextVariants[idx],
+          label: '250ml',
+          price: variant250Price,
+          stock: 50,
+          weight: weightFrom100,
+        };
+      } else {
+        nextVariants.push({
+          label: '250ml',
+          price: variant250Price,
+          stock: 50,
+          weight: weightFrom100,
+          image: '',
+        });
+      }
+
+      product.variants = nextVariants;
+      await product.save();
+      updated += 1;
+    }
+
+    return res.status(200).json({
+      message: 'Selected essential-oil 250ml sync completed',
+      result: {
+        targetRequested: TARGET_PRODUCTS.length,
+        matchedProducts: candidates.length,
+        updatedProducts: updated,
+        skippedNo100mlCount: skippedNo100ml.length,
+        skippedNo100ml,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Selected essential-oil 250ml sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -703,4 +805,5 @@ module.exports = {
   syncEssentialOil100mlVariants,
   mapEssentialOilImages,
   setStandardVariantWeights,
+  syncSelectedEssentialOils250ml,
 };
