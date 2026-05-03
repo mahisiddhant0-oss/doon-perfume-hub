@@ -933,7 +933,7 @@ const syncTenKgEnquiryVariants = async (req, res) => {
     const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
     const isTargetName = (name = '') => {
       const value = String(name || '').toUpperCase();
-      return value.includes('5KG ESSENTIAL OIL') || value.includes('25KG ESSENTIAL OIL');
+      return /(^|\s)5\s*KG\s+ESSENTIAL\s+OIL\b/.test(value) || /(^|\s)25\s*KG\s+ESSENTIAL\s+OIL\b/.test(value);
     };
 
     const products = await Product.find({ isActive: true }).select('name variants');
