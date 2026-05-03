@@ -1016,6 +1016,115 @@ const syncTenKgEnquiryVariants = async (req, res) => {
   }
 };
 
+// @desc    Add/update 10kg enquiry variant for all essential-oils products and apply provided image
+// @route   POST /api/products/admin/sync-10kg-essential-oils
+// @access  Private/Admin
+const syncTenKgForAllEssentialOils = async (req, res) => {
+  try {
+    const imageUrl = String(req.body?.imageUrl || '').trim();
+    if (!/^https?:\/\//i.test(imageUrl)) {
+      return res.status(400).json({ message: 'Valid imageUrl is required' });
+    }
+
+    const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const isEssentialOilProduct = (product) => {
+      const primary = String(product?.category || '').toLowerCase();
+      const categories = Array.isArray(product?.categories)
+        ? product.categories.map((entry) => String(entry || '').toLowerCase())
+        : [];
+      return primary === 'essential-oils' || categories.includes('essential-oils');
+    };
+
+    const products = await Product.find({ isActive: true }).select('name category categories images variants');
+    let matchedProducts = 0;
+    let updatedProducts = 0;
+    let createdVariants = 0;
+    let updatedVariants = 0;
+    let updatedProductImages = 0;
+
+    for (const product of products) {
+      if (!isEssentialOilProduct(product)) continue;
+      matchedProducts += 1;
+
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      const idx10 = variants.findIndex((variant) => normalizeLabel(variant?.label) === '10kg');
+      const baseVariant = variants[0] || null;
+      const fallbackStock = Number.isFinite(Number(baseVariant?.stock)) ? Number(baseVariant.stock) : 50;
+
+      let changed = false;
+
+      const currentFirstImage = Array.isArray(product.images) && product.images.length > 0 ? String(product.images[0] || '').trim() : '';
+      if (currentFirstImage !== imageUrl) {
+        product.images = [imageUrl];
+        changed = true;
+        updatedProductImages += 1;
+      }
+
+      if (idx10 >= 0) {
+        const current = variants[idx10];
+        const next = {
+          ...current.toObject?.(),
+          label: '10kg',
+          weight: 10,
+          price: 0,
+          image: imageUrl,
+          stock: Number.isFinite(Number(current?.stock)) ? Number(current.stock) : fallbackStock,
+        };
+        const currentLabel = String(current?.label || '').trim().toLowerCase();
+        const currentWeight = Number(current?.weight);
+        const currentPrice = Number(current?.price);
+        const currentImage = String(current?.image || '').trim();
+        const nextStock = Number(next.stock);
+        const currentStock = Number(current?.stock);
+        if (
+          currentLabel !== '10kg' ||
+          currentWeight !== 10 ||
+          currentPrice !== 0 ||
+          currentImage !== imageUrl ||
+          currentStock !== nextStock
+        ) {
+          variants[idx10] = next;
+          changed = true;
+          updatedVariants += 1;
+        }
+      } else {
+        variants.push({
+          label: '10kg',
+          price: 0,
+          stock: fallbackStock,
+          weight: 10,
+          image: imageUrl,
+        });
+        changed = true;
+        createdVariants += 1;
+      }
+
+      if (!changed) continue;
+      product.variants = variants;
+      await product.save();
+      updatedProducts += 1;
+    }
+
+    return res.status(200).json({
+      message: '10kg essential-oils sync completed',
+      result: {
+        imageUrl,
+        productsScanned: products.length,
+        matchedProducts,
+        updatedProducts,
+        createdVariants,
+        updatedVariants,
+        updatedProductImages,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: '10kg essential-oils sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -1036,4 +1145,5 @@ module.exports = {
   repriceAll250mlVariants,
   setFiveKgProductsImage,
   syncTenKgEnquiryVariants,
+  syncTenKgForAllEssentialOils,
 };
