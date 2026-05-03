@@ -39,8 +39,6 @@ interface Product {
   stock: number;
 }
 
-const SIZE_ORDER = ["100ml", "250ml", "500ml", "1000ml", "5kg", "10kg", "25kg"];
-
 const normalizeVariantLabel = (value: string) =>
   String(value || "").trim().toLowerCase().replace(/\s+/g, "");
 
@@ -50,13 +48,20 @@ const isBookNowVariantLabel = (label?: string) => {
 };
 
 const sortVariantsByPreferredSize = (variants: Variant[] = []) => {
+  const toSortSize = (label: string) => {
+    const normalized = normalizeVariantLabel(label);
+    const mlMatch = normalized.match(/^(\d+(?:\.\d+)?)ml$/);
+    if (mlMatch) return Number(mlMatch[1]);
+    const kgMatch = normalized.match(/^(\d+(?:\.\d+)?)kg$/);
+    if (kgMatch) return Number(kgMatch[1]) * 1000;
+    return Number.MAX_SAFE_INTEGER;
+  };
+
   return [...variants].sort((a, b) => {
     const aLabel = normalizeVariantLabel(a.label);
     const bLabel = normalizeVariantLabel(b.label);
-    const aIndex = SIZE_ORDER.indexOf(aLabel);
-    const bIndex = SIZE_ORDER.indexOf(bLabel);
-    const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
-    const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+    const aRank = toSortSize(aLabel);
+    const bRank = toSortSize(bLabel);
     if (aRank !== bRank) return aRank - bRank;
     return aLabel.localeCompare(bLabel);
   });
