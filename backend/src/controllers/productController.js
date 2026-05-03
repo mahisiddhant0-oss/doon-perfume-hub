@@ -789,6 +789,69 @@ const syncSelectedEssentialOils250ml = async (req, res) => {
   }
 };
 
+// @desc    Recalculate all 250ml variant prices using 100ml base: (100ml * 2.5) + 75
+// @route   POST /api/products/admin/reprice-250ml-variants
+// @access  Private/Admin
+const repriceAll250mlVariants = async (req, res) => {
+  try {
+    const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+
+    const products = await Product.find({ isActive: true }).select('name variants');
+    let productsUpdated = 0;
+    let variantsUpdated = 0;
+    let skippedNo100ml = 0;
+    let skippedNo250ml = 0;
+
+    for (const product of products) {
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      if (variants.length === 0) continue;
+
+      const idx100 = variants.findIndex((variant) => normalizeLabel(variant?.label) === '100ml');
+      const idx250 = variants.findIndex((variant) => normalizeLabel(variant?.label) === '250ml');
+
+      if (idx250 === -1) {
+        skippedNo250ml += 1;
+        continue;
+      }
+      if (idx100 === -1 || !Number.isFinite(Number(variants[idx100]?.price))) {
+        skippedNo100ml += 1;
+        continue;
+      }
+
+      const newPrice = Math.round(Number(variants[idx100].price) * 2.5 + 75);
+      const prevPrice = Number(variants[idx250]?.price);
+      if (prevPrice === newPrice) continue;
+
+      variants[idx250] = {
+        ...variants[idx250].toObject?.(),
+        price: newPrice,
+      };
+
+      product.variants = variants;
+      await product.save();
+      productsUpdated += 1;
+      variantsUpdated += 1;
+    }
+
+    return res.status(200).json({
+      message: '250ml repricing completed',
+      result: {
+        productsScanned: products.length,
+        productsUpdated,
+        variantsUpdated,
+        formula: '(100ml * 2.5) + 75',
+        skippedNo100ml,
+        skippedNo250ml,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: '250ml repricing failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -806,4 +869,5 @@ module.exports = {
   mapEssentialOilImages,
   setStandardVariantWeights,
   syncSelectedEssentialOils250ml,
+  repriceAll250mlVariants,
 };
