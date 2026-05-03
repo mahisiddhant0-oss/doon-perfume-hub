@@ -668,7 +668,7 @@ export default function Home() {
 
       <section className="py-16 md:py-24 bg-[var(--color-brand-bg)] border-t border-[var(--color-brand-border)]">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6 mb-10 md:mb-14">
+          <div className="mb-10 md:mb-14">
             <div>
               <p className="text-[10px] md:text-xs font-bold tracking-[0.28em] text-[var(--color-brand-primary)] uppercase mb-3">
                 Premium Partner Showcase
@@ -679,16 +679,6 @@ export default function Home() {
               <p className="text-gray-500 mt-3 max-w-2xl text-sm md:text-base leading-relaxed">
                 Explore a curated range of premium essential oils inspired by global fragrance standards and crafted for consistent aroma quality.
               </p>
-            </div>
-            <div className="bg-white border border-[var(--color-brand-border)] px-5 py-4 w-fit shadow-sm">
-              <Image
-                src="/givaudan-logo.svg"
-                alt="Givaudan"
-                width={170}
-                height={88}
-                className="h-auto w-[130px] md:w-[170px] object-contain"
-                unoptimized
-              />
             </div>
           </div>
 
