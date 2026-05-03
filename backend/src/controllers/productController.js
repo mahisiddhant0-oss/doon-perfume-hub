@@ -320,6 +320,7 @@ const getProducts = async (req, res) => {
       .split(',')
       .map((entry) => String(entry || '').trim())
       .filter(Boolean);
+    const hasSearchFilter = Boolean(safeKeyword) || requestedCategories.length > 0;
 
     const categoryFilter =
       requestedCategories.length > 0
@@ -333,16 +334,29 @@ const getProducts = async (req, res) => {
 
     // For public, we might only want to show active products
     const products = await Product.find({ ...keyword, ...categoryFilter, isActive: true });
-    
-    // If no products in DB, return mock data
+
+    // For filtered searches/categories, preserve empty results so frontend can show "No products found".
+    if (products.length === 0 && hasSearchFilter) {
+      return res.json([]);
+    }
+
+    // Keep legacy mock fallback only for completely unfiltered requests.
     if (products.length === 0) {
       return res.json(MOCK_PRODUCTS);
     }
-    
+
     res.json(products);
   } catch (error) {
     console.warn('DB Fetch failed, returning MOCK_PRODUCTS');
-    res.json(MOCK_PRODUCTS); // Return mock data on error as well
+    const requestedCategories = String(req.query.category || '')
+      .split(',')
+      .map((entry) => String(entry || '').trim())
+      .filter(Boolean);
+    const hasSearchFilter = Boolean(normalizeKeyword(req.query.keyword)) || requestedCategories.length > 0;
+    if (hasSearchFilter) {
+      return res.json([]);
+    }
+    res.json(MOCK_PRODUCTS); // Return mock data on unfiltered errors
   }
 };
 
