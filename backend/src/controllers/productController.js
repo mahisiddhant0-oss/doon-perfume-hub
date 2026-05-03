@@ -16,6 +16,24 @@ const normalizeWeightKg = (value) => {
 };
 
 const normalizeSku = (value = '') => String(value || '').trim();
+const normalizeSearchKeywords = (searchKeywords) => {
+  const fromArray = Array.isArray(searchKeywords)
+    ? searchKeywords
+    : typeof searchKeywords === 'string'
+      ? searchKeywords.split(',')
+      : [];
+
+  const seen = new Set();
+  return fromArray
+    .map((entry) => String(entry || '').trim().toLowerCase())
+    .filter(Boolean)
+    .filter((entry) => {
+      if (entry.length > 80) return false;
+      if (seen.has(entry)) return false;
+      seen.add(entry);
+      return true;
+    });
+};
 const EXCLUDED_CATEGORY_VALUES = new Set(['attars', 'ouds']);
 const DEFAULT_CATEGORY_VALUES = ['all', 'perfumes', 'essential-oils', 'bottles'];
 const formatCategoryName = (value = '') =>
@@ -307,12 +325,30 @@ const getProducts = async (req, res) => {
     const safeKeyword = normalizeKeyword(req.query.keyword);
 
     // Escape user input before regex to prevent invalid patterns and regex injection.
-    const keyword = safeKeyword
+    const keywordFilter = safeKeyword
       ? {
-          name: {
-            $regex: escapeRegex(safeKeyword),
-            $options: 'i', // case-insensitive
-          },
+          $or: [
+            {
+              name: {
+                $regex: escapeRegex(safeKeyword),
+                $options: 'i', // case-insensitive
+              },
+            },
+            {
+              sku: {
+                $regex: escapeRegex(safeKeyword),
+                $options: 'i',
+              },
+            },
+            {
+              searchKeywords: {
+                $elemMatch: {
+                  $regex: escapeRegex(safeKeyword),
+                  $options: 'i',
+                },
+              },
+            },
+          ],
         }
       : {};
 
@@ -333,7 +369,7 @@ const getProducts = async (req, res) => {
         : {};
 
     // For public, we might only want to show active products
-    const products = await Product.find({ ...keyword, ...categoryFilter, isActive: true });
+    const products = await Product.find({ ...keywordFilter, ...categoryFilter, isActive: true });
 
     // For filtered searches/categories, preserve empty results so frontend can show "No products found".
     if (products.length === 0 && hasSearchFilter) {
@@ -381,9 +417,10 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, categories, stock, images, attributes, weightKg, variants, enquiryOnly } = req.body;
+    const { name, description, searchKeywords, price, sku, category, categories, stock, images, attributes, weightKg, variants, enquiryOnly } = req.body;
     const normalizedCategories = normalizeCategories(category, categories);
     const normalizedSku = normalizeSku(sku);
+    const normalizedSearchKeywords = normalizeSearchKeywords(searchKeywords);
 
     const productExists = await Product.findOne({ sku: normalizedSku });
     if (productExists) {
@@ -393,6 +430,7 @@ const createProduct = async (req, res) => {
     const product = new Product({
       name: String(name || '').trim(),
       description,
+      searchKeywords: normalizedSearchKeywords,
       price,
       sku: normalizedSku,
       category: normalizedCategories[0],
@@ -424,13 +462,14 @@ const createProduct = async (req, res) => {
 // @access  Private/Admin
 const updateProduct = async (req, res) => {
   try {
-    const { name, description, price, sku, category, categories, stock, images, attributes, isActive, weightKg, variants, enquiryOnly } = req.body;
+    const { name, description, searchKeywords, price, sku, category, categories, stock, images, attributes, isActive, weightKg, variants, enquiryOnly } = req.body;
 
     const product = await Product.findById(req.params.id);
 
     if (product) {
       product.name = name !== undefined ? String(name || '').trim() : product.name;
       product.description = description || product.description;
+      if (searchKeywords !== undefined) product.searchKeywords = normalizeSearchKeywords(searchKeywords);
       product.price = price !== undefined ? price : product.price;
       product.sku = sku !== undefined ? normalizeSku(sku) : product.sku;
       if (category !== undefined || categories !== undefined) {

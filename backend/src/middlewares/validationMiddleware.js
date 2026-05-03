@@ -76,6 +76,8 @@ const productValidation = [
   body('variants.*.weight').optional().isNumeric().withMessage('Variant weight must be a number').custom((v) => v >= 0).withMessage('Variant weight cannot be negative'),
   body('variants.*.image').optional({ values: 'falsy' }).trim().isLength({ max: 2000 }).withMessage('Variant image URL is too long'),
   body('description').optional().trim().isLength({ max: 5000 }).withMessage('Description is too long'),
+  body('searchKeywords').optional().isArray().withMessage('searchKeywords must be an array'),
+  body('searchKeywords.*').optional().trim().isLength({ min: 1, max: 80 }).withMessage('Each search keyword must be between 1 and 80 characters'),
   validate,
 ];
 

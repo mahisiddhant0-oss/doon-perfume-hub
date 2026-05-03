@@ -24,6 +24,11 @@ const productSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  searchKeywords: {
+    type: [String],
+    default: [],
+    index: true,
+  },
   price: {
     type: Number,
     required: true,
@@ -78,6 +83,13 @@ productSchema.pre('validate', function syncCategoryFields() {
 
   this.categories = uniqueCategories;
   this.category = uniqueCategories[0] || normalizedPrimary || 'perfumes';
+
+  const normalizedKeywords = Array.isArray(this.searchKeywords)
+    ? this.searchKeywords
+        .map((entry) => String(entry || '').trim().toLowerCase())
+        .filter(Boolean)
+    : [];
+  this.searchKeywords = Array.from(new Set(normalizedKeywords));
 
 });
 

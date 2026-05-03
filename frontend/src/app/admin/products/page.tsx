@@ -20,6 +20,7 @@ type AdminProduct = {
   _id: string;
   name: string;
   sku: string;
+  searchKeywords?: string[];
   price: number;
   stock: number;
   weightKg?: number;
@@ -50,6 +51,7 @@ type VariantForm = {
 type ProductForm = {
   name: string;
   sku: string;
+  searchKeywords: string;
   price: number;
   stock: number;
   weightKg: number;
@@ -93,6 +95,7 @@ const LOCAL_CUSTOM_CATEGORIES_KEY = 'dph_custom_categories';
 const emptyForm: ProductForm = {
   name: '',
   sku: '',
+  searchKeywords: '',
   price: 0,
   stock: 0,
   weightKg: 0,
@@ -337,6 +340,7 @@ export default function AdminProducts() {
       setFormData({
         name: product.name,
         sku: product.sku,
+        searchKeywords: Array.isArray(product.searchKeywords) ? product.searchKeywords.join(', ') : '',
         price: product.price,
         stock: product.stock,
         weightKg: Number(product.weightKg || 0),
@@ -394,6 +398,10 @@ export default function AdminProducts() {
         },
         body: JSON.stringify({
           ...formData,
+          searchKeywords: formData.searchKeywords
+            .split(',')
+            .map((entry) => entry.trim())
+            .filter(Boolean),
           category: finalCategories[0] || formData.category || 'perfumes',
           categories: finalCategories,
           variants: formData.variants.filter((variant) => variant.label.trim().length > 0),
@@ -547,10 +555,11 @@ export default function AdminProducts() {
       result = result.filter((product) => {
         const name = product.name?.toLowerCase() || '';
         const sku = product.sku?.toLowerCase() || '';
+        const hiddenKeywords = Array.isArray(product.searchKeywords) ? product.searchKeywords.join(' ').toLowerCase() : '';
         const categories = Array.isArray(product.categories) && product.categories.length > 0
           ? product.categories.join(' ').toLowerCase()
           : (product.category?.toLowerCase() || '');
-        return name.includes(query) || sku.includes(query) || categories.includes(query);
+        return name.includes(query) || sku.includes(query) || categories.includes(query) || hiddenKeywords.includes(query);
       });
     }
 
@@ -1013,6 +1022,17 @@ export default function AdminProducts() {
                     className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Hidden Search Keywords (comma separated)</label>
+                <input
+                  type="text"
+                  placeholder="e.g. fresh, office, long lasting, woody"
+                  value={formData.searchKeywords}
+                  onChange={(e) => setFormData({ ...formData, searchKeywords: e.target.value })}
+                  className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                />
+                <p className="text-[11px] text-[#666]">These keywords are hidden from customers but searchable on the products page.</p>
               </div>
 
               <div className="grid grid-cols-4 gap-4">
