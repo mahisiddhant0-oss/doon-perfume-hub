@@ -105,6 +105,20 @@ function getIsProductOutOfStock(product: Product): boolean {
   return !(variantHasStock || baseHasStock);
 }
 
+function getCardStartingPrice(product: Product): number {
+  if (Array.isArray(product.variants) && product.variants.length > 0) {
+    const prices = product.variants
+      .filter((variant) => {
+        const label = String(variant?.label || '').trim().toLowerCase().replace(/\s+/g, '');
+        return label !== '5kg' && label !== '10kg' && label !== '25kg';
+      })
+      .map((variant) => Number(variant?.price))
+      .filter((price) => Number.isFinite(price) && price > 0);
+    if (prices.length > 0) return Math.min(...prices);
+  }
+  return Number(product.price || 0);
+}
+
 function formatCategoryLabel(value: string) {
   const knownLabels: Record<string, string> = {
     perfumes: 'Perfumes',
@@ -507,8 +521,8 @@ function ProductsPageContent() {
               <p className="text-sm text-gray-400 mb-6">{products.length} products found</p>
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {products.map((product) => {
-                  const isEnquiryOnly = Boolean(product.enquiryOnly);
-                  const isOutOfStock = !isEnquiryOnly && getIsProductOutOfStock(product);
+                  const isOutOfStock = getIsProductOutOfStock(product);
+                  const startingPrice = getCardStartingPrice(product);
                   const cardClassName = `group flex flex-col bg-white overflow-hidden shadow-sm transition-shadow ${
                     isOutOfStock ? "opacity-95 cursor-not-allowed" : "hover:shadow-md"
                   }`;
@@ -541,13 +555,7 @@ function ProductsPageContent() {
                         {getPrimaryCategory(product).replace('-', ' ')}
                       </span>
                       <h3 className="font-serif text-sm sm:text-base text-gray-900 mb-2 leading-snug">{product.name}</h3>
-                      <p className="text-gray-700 font-medium mb-4">
-                        {isEnquiryOnly
-                          ? 'BOOK NOW'
-                          : product.variants.length > 0
-                            ? `From ₹${Math.min(...product.variants.map(v => v.price)).toLocaleString('en-IN')}`
-                            : `₹${product.price.toLocaleString('en-IN')}`}
-                      </p>
+                      <p className="text-gray-700 font-medium mb-4">{`From Rs. ${startingPrice.toLocaleString('en-IN')}`}</p>
                       <div className="mt-auto">
                         {isOutOfStock ? (
                           <span className="block w-full border border-gray-300 bg-gray-200 text-gray-600 py-2 text-xs tracking-widest font-semibold cursor-not-allowed">
@@ -555,7 +563,7 @@ function ProductsPageContent() {
                           </span>
                         ) : (
                           <span className="block w-full border border-[var(--color-brand-primary)] text-[var(--color-brand-primary)] py-2 text-xs tracking-widest font-semibold group-hover:bg-[var(--color-brand-primary)] group-hover:text-white transition-colors duration-300">
-                            {isEnquiryOnly ? 'BOOK NOW' : 'VIEW PRODUCT'}
+                            VIEW PRODUCT
                           </span>
                         )}
                       </div>

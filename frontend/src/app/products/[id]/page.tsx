@@ -39,10 +39,15 @@ interface Product {
   stock: number;
 }
 
-const SIZE_ORDER = ["100ml", "250ml", "500ml", "1000ml"];
+const SIZE_ORDER = ["100ml", "250ml", "500ml", "1000ml", "5kg", "10kg", "25kg"];
 
 const normalizeVariantLabel = (value: string) =>
   String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+
+const isBookNowVariantLabel = (label?: string) => {
+  const normalized = normalizeVariantLabel(String(label || ""));
+  return normalized === "5kg" || normalized === "10kg" || normalized === "25kg";
+};
 
 const sortVariantsByPreferredSize = (variants: Variant[] = []) => {
   return [...variants].sort((a, b) => {
@@ -71,12 +76,8 @@ const matchesOilPackSize = (name: string, kg: number) => {
   return pattern.test(name);
 };
 
-const isEnquiryVariantForProduct = (product: Product, variantLabel?: string) => {
-  const normalizedLabel = String(variantLabel || "").trim().toLowerCase();
-  if (matchesOilPackSize(product.name, 25)) return normalizedLabel === "25kg" || normalizedLabel === "10kg";
-  if (matchesOilPackSize(product.name, 5)) return normalizedLabel === "5kg" || normalizedLabel === "10kg";
-  return Boolean(product.enquiryOnly);
-};
+const isEnquiryVariantForProduct = (_product: Product, variantLabel?: string) =>
+  isBookNowVariantLabel(variantLabel);
 
 const withSpecialVariantsForFiveKgOil = (product: Product): Product => {
   const isTwentyFiveKgEssentialOilProduct = matchesOilPackSize(product.name, 25);
@@ -287,8 +288,10 @@ export default function ProductDetails() {
         if (nextProduct.variants?.length > 0) {
           const preferredVariant =
             nextProduct.variants.find(
-              (variant) => String(variant.label || "").trim().toLowerCase() === "100ml"
-            ) || nextProduct.variants[0];
+              (variant) => normalizeVariantLabel(variant.label) === "100ml" && !isBookNowVariantLabel(variant.label)
+            ) ||
+            nextProduct.variants.find((variant) => !isBookNowVariantLabel(variant.label)) ||
+            nextProduct.variants[0];
           setSelectedVariant(preferredVariant);
           setMainImage(preferredVariant.image?.trim() || fallbackImage);
         }
@@ -304,7 +307,7 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (!product) return;
-    if (isEnquiryVariantForProduct(product, selectedVariant?.label)) return;
+    if (isBookNowVariantLabel(selectedVariant?.label)) return;
     const isOutOfStock = selectedVariant
       ? Number(selectedVariant.stock || 0) <= 0
       : getIsProductOutOfStock(product);
@@ -379,7 +382,7 @@ export default function ProductDetails() {
   }
 
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-  const isEnquiryOnly = isEnquiryVariantForProduct(product, selectedVariant?.label);
+  const isEnquiryOnly = isBookNowVariantLabel(selectedVariant?.label);
   const isOutOfStock = selectedVariant
     ? Number(selectedVariant.stock || 0) <= 0
     : getIsProductOutOfStock(product);
