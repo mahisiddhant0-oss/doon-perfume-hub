@@ -852,6 +852,79 @@ const repriceAll250mlVariants = async (req, res) => {
   }
 };
 
+// @desc    Apply one image URL to all products that contain a 5kg variant
+// @route   POST /api/products/admin/set-5kg-image
+// @access  Private/Admin
+const setFiveKgProductsImage = async (req, res) => {
+  try {
+    const imageUrl = String(req.body?.imageUrl || '').trim();
+    if (!/^https?:\/\//i.test(imageUrl)) {
+      return res.status(400).json({ message: 'Valid imageUrl is required' });
+    }
+
+    const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const products = await Product.find({ isActive: true }).select('name images variants');
+
+    let matchedProducts = 0;
+    let updatedProducts = 0;
+    let updatedVariantImages = 0;
+
+    for (const product of products) {
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      if (!variants.length) continue;
+
+      const fiveKgIndexes = [];
+      variants.forEach((variant, idx) => {
+        if (normalizeLabel(variant?.label) === '5kg') fiveKgIndexes.push(idx);
+      });
+      if (fiveKgIndexes.length === 0) continue;
+
+      matchedProducts += 1;
+      let changed = false;
+
+      const currentFirstImage = Array.isArray(product.images) && product.images.length > 0 ? String(product.images[0] || '').trim() : '';
+      if (currentFirstImage !== imageUrl) {
+        product.images = [imageUrl];
+        changed = true;
+      }
+
+      for (const idx of fiveKgIndexes) {
+        const currentVariantImage = String(variants[idx]?.image || '').trim();
+        if (currentVariantImage !== imageUrl) {
+          variants[idx] = {
+            ...variants[idx].toObject?.(),
+            image: imageUrl,
+          };
+          changed = true;
+          updatedVariantImages += 1;
+        }
+      }
+
+      if (changed) {
+        product.variants = variants;
+        await product.save();
+        updatedProducts += 1;
+      }
+    }
+
+    return res.status(200).json({
+      message: '5kg image sync completed',
+      result: {
+        imageUrl,
+        productsScanned: products.length,
+        matchedProducts,
+        updatedProducts,
+        updatedVariantImages,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: '5kg image sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -870,4 +943,5 @@ module.exports = {
   setStandardVariantWeights,
   syncSelectedEssentialOils250ml,
   repriceAll250mlVariants,
+  setFiveKgProductsImage,
 };
