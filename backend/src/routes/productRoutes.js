@@ -19,6 +19,7 @@ const {
   syncSelectedEssentialOils250ml,
   repriceAll250mlVariants,
   setFiveKgProductsImage,
+  syncTenKgEnquiryVariants,
 } = require('../controllers/productController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { productValidation } = require('../middlewares/validationMiddleware');
@@ -42,6 +43,7 @@ router.route('/admin/set-standard-variant-weights').post(protect, adminRights, s
 router.route('/admin/sync-selected-essential-oils-250ml').post(protect, adminRights, syncSelectedEssentialOils250ml);
 router.route('/admin/reprice-250ml-variants').post(protect, adminRights, repriceAll250mlVariants);
 router.route('/admin/set-5kg-image').post(protect, adminRights, setFiveKgProductsImage);
+router.route('/admin/sync-10kg-enquiry-variants').post(protect, adminRights, syncTenKgEnquiryVariants);
 router.route('/:id').put(protect, adminRights, productValidation, updateProduct);
 router.route('/:id').delete(protect, adminRights, deleteProduct);
 

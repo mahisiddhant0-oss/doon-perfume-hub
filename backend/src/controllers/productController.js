@@ -925,6 +925,97 @@ const setFiveKgProductsImage = async (req, res) => {
   }
 };
 
+// @desc    Add/update 10kg variant for products containing 5KG/25KG ESSENTIAL OIL in name
+// @route   POST /api/products/admin/sync-10kg-enquiry-variants
+// @access  Private/Admin
+const syncTenKgEnquiryVariants = async (req, res) => {
+  try {
+    const normalizeLabel = (value = '') => String(value || '').trim().toLowerCase().replace(/\s+/g, '');
+    const isTargetName = (name = '') => {
+      const value = String(name || '').toUpperCase();
+      return value.includes('5KG ESSENTIAL OIL') || value.includes('25KG ESSENTIAL OIL');
+    };
+
+    const products = await Product.find({ isActive: true }).select('name variants');
+    let matchedProducts = 0;
+    let updatedProducts = 0;
+    let createdVariants = 0;
+    let updatedVariants = 0;
+
+    for (const product of products) {
+      if (!isTargetName(product.name)) continue;
+      matchedProducts += 1;
+
+      const variants = Array.isArray(product.variants) ? [...product.variants] : [];
+      const idx10 = variants.findIndex((variant) => normalizeLabel(variant?.label) === '10kg');
+      const baseVariant = variants[0] || null;
+      const fallbackImage = String(baseVariant?.image || '').trim();
+
+      let changed = false;
+      if (idx10 >= 0) {
+        const current = variants[idx10];
+        const next = {
+          ...current.toObject?.(),
+          label: '10kg',
+          weight: 10,
+          stock: Number.isFinite(Number(current?.stock)) ? Number(current.stock) : 50,
+          price: 0,
+        };
+        if (String(next.image || '').trim().length === 0 && fallbackImage) {
+          next.image = fallbackImage;
+        }
+
+        const currentWeight = Number(current?.weight);
+        const currentPrice = Number(current?.price);
+        const currentLabel = String(current?.label || '').trim().toLowerCase();
+        const currentImage = String(current?.image || '').trim();
+        const nextImage = String(next.image || '').trim();
+        if (
+          currentLabel !== '10kg' ||
+          currentWeight !== 10 ||
+          currentPrice !== 0 ||
+          currentImage !== nextImage
+        ) {
+          variants[idx10] = next;
+          changed = true;
+          updatedVariants += 1;
+        }
+      } else {
+        variants.push({
+          label: '10kg',
+          price: 0,
+          stock: 50,
+          weight: 10,
+          image: fallbackImage,
+        });
+        changed = true;
+        createdVariants += 1;
+      }
+
+      if (!changed) continue;
+      product.variants = variants;
+      await product.save();
+      updatedProducts += 1;
+    }
+
+    return res.status(200).json({
+      message: '10kg enquiry variant sync completed',
+      result: {
+        productsScanned: products.length,
+        matchedProducts,
+        updatedProducts,
+        createdVariants,
+        updatedVariants,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: '10kg enquiry variant sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -944,4 +1035,5 @@ module.exports = {
   syncSelectedEssentialOils250ml,
   repriceAll250mlVariants,
   setFiveKgProductsImage,
+  syncTenKgEnquiryVariants,
 };

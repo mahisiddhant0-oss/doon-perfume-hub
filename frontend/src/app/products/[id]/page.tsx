@@ -73,8 +73,8 @@ const matchesOilPackSize = (name: string, kg: number) => {
 
 const isEnquiryVariantForProduct = (product: Product, variantLabel?: string) => {
   const normalizedLabel = String(variantLabel || "").trim().toLowerCase();
-  if (matchesOilPackSize(product.name, 25)) return normalizedLabel === "25kg";
-  if (matchesOilPackSize(product.name, 5)) return normalizedLabel === "5kg";
+  if (matchesOilPackSize(product.name, 25)) return normalizedLabel === "25kg" || normalizedLabel === "10kg";
+  if (matchesOilPackSize(product.name, 5)) return normalizedLabel === "5kg" || normalizedLabel === "10kg";
   return Boolean(product.enquiryOnly);
 };
 
