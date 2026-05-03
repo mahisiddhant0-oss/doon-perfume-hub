@@ -703,7 +703,24 @@ export default function Home() {
       <section className="py-16 md:py-24 bg-[var(--color-brand-bg)] border-t border-[var(--color-brand-border)]">
         <div className="max-w-7xl mx-auto px-4 md:px-8">
           <div className="mb-10 md:mb-14">
-            <div>
+            <div className="relative overflow-hidden border border-[var(--color-brand-border)] bg-gradient-to-br from-white via-[#f8fbff] to-[#eef5ff] p-6 md:p-10">
+              <div className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[var(--color-brand-primary)]/10 blur-2xl" />
+              <div className="pointer-events-none absolute -left-16 -bottom-20 h-52 w-52 rounded-full bg-[#b40f3b]/10 blur-3xl" />
+              <div className="relative z-10 mb-5 inline-flex items-center gap-3 border border-[#b40f3b]/20 bg-white/90 px-3 py-2 shadow-sm backdrop-blur">
+                <div className="relative h-8 w-32 md:h-10 md:w-40">
+                  <Image
+                    src="/givaudan-red.png"
+                    alt="Givaudan"
+                    fill
+                    className="object-contain object-left"
+                    unoptimized
+                  />
+                </div>
+                <span className="h-5 w-px bg-[var(--color-brand-border)]" />
+                <p className="text-[10px] md:text-[11px] font-bold tracking-[0.18em] uppercase text-[#b40f3b]">
+                  Partner Oils
+                </p>
+              </div>
               <p className="text-[10px] md:text-xs font-bold tracking-[0.28em] text-[var(--color-brand-primary)] uppercase mb-3">
                 Premium Partner Showcase
               </p>
