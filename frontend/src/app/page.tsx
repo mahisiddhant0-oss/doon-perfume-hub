@@ -57,6 +57,12 @@ const formatCategoryLabel = (value: string) =>
     .replace(/\b\w/g, (char) => char.toUpperCase());
 const normalizeDisplayLabel = (value: string) =>
   formatCategoryLabel(String(value || '').toLowerCase());
+const normalizeProductName = (value: string) =>
+  String(value || '')
+    .toUpperCase()
+    .replace(/\s+ESSENTIAL\s+OIL$/i, '')
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .trim();
 
 export default function Home() {
   const router = useRouter();
@@ -161,13 +167,41 @@ export default function Home() {
   }, [categories]);
 
   const givaudanEssentialOils = useMemo(() => {
+    const preferredOrder = [
+      'ARABIC LURE',
+      'AFGHAN TIGER',
+      'GYPSY TRAIL',
+      'RED DIAMOND',
+      'ORCHID SUNSET',
+      'AMBERY NIGHTS',
+      'COOL DRIFT',
+      'ADVENTURE TRAILS',
+    ];
+
     const oils = allProducts.filter((product) => {
       const categoriesForProduct = getProductCategories(product).map((entry) =>
         String(entry || '').trim().toLowerCase()
       );
       return categoriesForProduct.includes('essential-oils');
     });
-    return oils.slice(0, 8);
+
+    const byName = new Map(oils.map((product) => [normalizeProductName(product.name), product]));
+    const picked: Product[] = [];
+
+    preferredOrder.forEach((name) => {
+      const match = byName.get(name);
+      if (match) picked.push(match);
+    });
+
+    if (picked.length < 8) {
+      oils.forEach((product) => {
+        if (picked.length >= 8) return;
+        if (picked.some((entry) => entry._id === product._id)) return;
+        picked.push(product);
+      });
+    }
+
+    return picked.slice(0, 8);
   }, [allProducts]);
 
   const handleCategoryRailMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
