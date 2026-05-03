@@ -15,6 +15,7 @@ const {
   syncWixImages,
   syncEssentialOil100mlVariants,
   mapEssentialOilImages,
+  setStandardVariantWeights,
 } = require('../controllers/productController');
 const { protect, adminRights } = require('../middlewares/authMiddleware');
 const { productValidation } = require('../middlewares/validationMiddleware');
@@ -34,6 +35,7 @@ router.route('/').post(protect, adminRights, productValidation, createProduct);
 router.route('/admin/sync-wix-images').post(protect, adminRights, syncWixImages);
 router.route('/admin/sync-essential-oils-100ml').post(protect, adminRights, syncEssentialOil100mlVariants);
 router.route('/admin/map-essential-oil-images').post(protect, adminRights, mapEssentialOilImages);
+router.route('/admin/set-standard-variant-weights').post(protect, adminRights, setStandardVariantWeights);
 router.route('/:id').put(protect, adminRights, productValidation, updateProduct);
 router.route('/:id').delete(protect, adminRights, deleteProduct);
 

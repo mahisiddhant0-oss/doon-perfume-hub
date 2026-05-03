@@ -634,6 +634,59 @@ const mapEssentialOilImages = async (req, res) => {
   }
 };
 
+// @desc    Set variant weight to 1kg for 100ml/250ml/500ml/1000ml across all products
+// @route   POST /api/products/admin/set-standard-variant-weights
+// @access  Private/Admin
+const setStandardVariantWeights = async (req, res) => {
+  try {
+    const targetLabels = new Set(['100ml', '250ml', '500ml', '1000ml']);
+    const targetWeight = 1;
+
+    const products = await Product.find({}).select('variants');
+    let productsUpdated = 0;
+    let variantsUpdated = 0;
+
+    for (const product of products) {
+      if (!Array.isArray(product.variants) || product.variants.length === 0) continue;
+
+      let changed = false;
+      const nextVariants = product.variants.map((variant) => {
+        const normalizedLabel = String(variant?.label || '').trim().toLowerCase().replace(/\s+/g, '');
+        if (!targetLabels.has(normalizedLabel)) return variant;
+        if (Number(variant?.weight) === targetWeight) return variant;
+
+        changed = true;
+        variantsUpdated += 1;
+        return {
+          ...variant.toObject?.(),
+          weight: targetWeight,
+        };
+      });
+
+      if (!changed) continue;
+      product.variants = nextVariants;
+      await product.save();
+      productsUpdated += 1;
+    }
+
+    return res.status(200).json({
+      message: 'Variant weight sync completed',
+      result: {
+        productsScanned: products.length,
+        productsUpdated,
+        variantsUpdated,
+        labels: ['100ml', '250ml', '500ml', '1000ml'],
+        weight: 1,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Variant weight sync failed',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProductCategories,
   createProductCategory,
@@ -649,4 +702,5 @@ module.exports = {
   syncWixImages,
   syncEssentialOil100mlVariants,
   mapEssentialOilImages,
+  setStandardVariantWeights,
 };
