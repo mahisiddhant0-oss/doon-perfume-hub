@@ -707,6 +707,15 @@ export default function Home() {
               </Link>
             ))}
           </div>
+          <div className="mt-8 md:mt-10 flex justify-center">
+            <Link
+              href="/products?category=essential-oils"
+              className="inline-flex items-center gap-3 bg-[var(--color-brand-primary)] text-white px-6 md:px-10 py-3 text-[11px] md:text-xs tracking-[0.18em] font-bold uppercase hover:bg-[var(--color-brand-primary-hover)] transition-all duration-300"
+            >
+              Load More Essential Oils
+              <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
       </section>
 
