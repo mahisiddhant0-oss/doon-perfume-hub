@@ -39,6 +39,24 @@ interface Product {
   stock: number;
 }
 
+const SIZE_ORDER = ["100ml", "250ml", "500ml", "1000ml"];
+
+const normalizeVariantLabel = (value: string) =>
+  String(value || "").trim().toLowerCase().replace(/\s+/g, "");
+
+const sortVariantsByPreferredSize = (variants: Variant[] = []) => {
+  return [...variants].sort((a, b) => {
+    const aLabel = normalizeVariantLabel(a.label);
+    const bLabel = normalizeVariantLabel(b.label);
+    const aIndex = SIZE_ORDER.indexOf(aLabel);
+    const bIndex = SIZE_ORDER.indexOf(bLabel);
+    const aRank = aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex;
+    const bRank = bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex;
+    if (aRank !== bRank) return aRank - bRank;
+    return aLabel.localeCompare(bLabel);
+  });
+};
+
 const getDeterministicPrice700To800 = (seed: string) => {
   let hash = 0;
   for (let i = 0; i < seed.length; i += 1) {
@@ -258,14 +276,19 @@ export default function ProductDetails() {
         if (!res.ok) throw new Error("Product not found");
         const data: Product = await res.json();
         const productWithVariants = withSpecialVariantsForFiveKgOil(data);
-        setProduct(productWithVariants);
-        const fallbackImage = productWithVariants.images?.[0] || DEFAULT_IMAGE;
+        const sortedVariants = sortVariantsByPreferredSize(productWithVariants.variants || []);
+        const nextProduct: Product = {
+          ...productWithVariants,
+          variants: sortedVariants,
+        };
+        setProduct(nextProduct);
+        const fallbackImage = nextProduct.images?.[0] || DEFAULT_IMAGE;
         setMainImage(fallbackImage);
-        if (productWithVariants.variants?.length > 0) {
+        if (nextProduct.variants?.length > 0) {
           const preferredVariant =
-            productWithVariants.variants.find(
+            nextProduct.variants.find(
               (variant) => String(variant.label || "").trim().toLowerCase() === "100ml"
-            ) || productWithVariants.variants[0];
+            ) || nextProduct.variants[0];
           setSelectedVariant(preferredVariant);
           setMainImage(preferredVariant.image?.trim() || fallbackImage);
         }
