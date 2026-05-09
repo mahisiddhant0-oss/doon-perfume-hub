@@ -905,6 +905,33 @@ const repriceAll250mlVariants = async (req, res) => {
   }
 };
 
+// @desc    Upload product images from admin panel (drag-drop / file picker)
+// @route   POST /api/products/admin/upload-images
+// @access  Private/Admin
+const uploadAdminProductImages = async (req, res) => {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (files.length === 0) {
+      return res.status(400).json({ message: 'No image files uploaded' });
+    }
+
+    const host = req.get('host');
+    const protocol = req.headers['x-forwarded-proto'] ? String(req.headers['x-forwarded-proto']).split(',')[0] : req.protocol;
+    const baseUrl = `${protocol}://${host}`;
+    const urls = files.map((file) => `${baseUrl}/uploads/products/${file.filename}`);
+
+    return res.status(201).json({
+      message: 'Images uploaded successfully',
+      urls,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: 'Image upload failed',
+      error: error.message,
+    });
+  }
+};
+
 // @desc    Apply one image URL to all products that contain a 5kg variant
 // @route   POST /api/products/admin/set-5kg-image
 // @access  Private/Admin
@@ -1194,6 +1221,7 @@ module.exports = {
   syncEssentialOil100mlVariants,
   mapEssentialOilImages,
   setStandardVariantWeights,
+  uploadAdminProductImages,
   syncSelectedEssentialOils250ml,
   repriceAll250mlVariants,
   setFiveKgProductsImage,

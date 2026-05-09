@@ -10,6 +10,7 @@ import {
   Edit2,
   Trash2,
   Image as ImageIcon,
+  UploadCloud,
   CheckCircle2,
   XCircle,
   Layers,
@@ -157,6 +158,10 @@ export default function AdminProducts() {
   const [deletingCategoryValue, setDeletingCategoryValue] = useState('');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+  const [imageUrlInput, setImageUrlInput] = useState('');
+  const [isUploadingImages, setIsUploadingImages] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [isImageDropActive, setIsImageDropActive] = useState(false);
 
   const readStoredCustomCategories = () => {
     if (typeof window === 'undefined') return [] as string[];
@@ -358,12 +363,16 @@ export default function AdminProducts() {
         description: product.description || '',
         images: product.images || []
       });
+      setImageUrlInput((product.images && product.images[0]) || '');
+      setUploadError('');
       setIsCategoryDropdownOpen(false);
       setIsCreatingCustomCategory(false);
       setCustomCategoryInput('');
     } else {
       setEditingProduct(null);
       setFormData(emptyForm);
+      setImageUrlInput('');
+      setUploadError('');
       setIsCategoryDropdownOpen(false);
       setIsCreatingCustomCategory(false);
       setCustomCategoryInput('');
@@ -534,6 +543,69 @@ export default function AdminProducts() {
     }
 
     return 0;
+  };
+
+  const addImageUrlToForm = () => {
+    const nextUrl = imageUrlInput.trim();
+    if (!nextUrl) return;
+    setFormData((prev) => {
+      const nextImages = [...new Set([...(prev.images || []), nextUrl])];
+      return { ...prev, images: nextImages };
+    });
+    setImageUrlInput('');
+  };
+
+  const removeImageFromForm = (targetUrl: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      images: (prev.images || []).filter((url) => url !== targetUrl),
+    }));
+  };
+
+  const uploadImagesToServer = async (files: File[]) => {
+    if (!files.length) return;
+    setIsUploadingImages(true);
+    setUploadError('');
+    try {
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (!token) {
+        throw new Error('Please login as admin to upload images.');
+      }
+
+      const payload = new FormData();
+      files.forEach((file) => payload.append('images', file));
+
+      const res = await fetch(`${API_ROUTES.PRODUCTS}/admin/upload-images`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload,
+      });
+
+      const responsePayload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(responsePayload?.message || 'Image upload failed');
+      }
+
+      const uploadedUrls = Array.isArray(responsePayload?.urls)
+        ? responsePayload.urls.map((entry: unknown) => String(entry || '').trim()).filter(Boolean)
+        : [];
+
+      if (uploadedUrls.length === 0) {
+        throw new Error('Upload completed but no image URLs were returned.');
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        images: [...new Set([...(prev.images || []), ...uploadedUrls])],
+      }));
+    } catch (error: any) {
+      setUploadError(error?.message || 'Image upload failed');
+    } finally {
+      setIsUploadingImages(false);
+    }
   };
 
   const visibleProducts = useMemo(() => {
@@ -1165,19 +1237,78 @@ export default function AdminProducts() {
 
               <div className="space-y-2">
                 <label className="text-[10px] uppercase tracking-widest text-[#888] font-bold">Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://example.com/product-image.jpg"
-                  value={formData.images[0] || ''}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    setFormData({
-                      ...formData,
-                      images: value ? [value] : [],
-                    });
+                <div className="grid grid-cols-[minmax(0,1fr)_100px] gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://example.com/product-image.jpg"
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                    className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={addImageUrlToForm}
+                    className="px-3 py-3 text-xs font-bold uppercase tracking-widest rounded-lg bg-[#D4AF37] text-black hover:bg-[#bda871] whitespace-nowrap"
+                  >
+                    Add URL
+                  </button>
+                </div>
+                <div
+                  className={`mt-2 rounded-lg border-2 border-dashed p-4 text-center transition-colors ${
+                    isImageDropActive ? 'border-[#D4AF37] bg-[#D4AF37]/5' : 'border-[#2a2a2a] bg-black/30'
+                  }`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsImageDropActive(true);
                   }}
-                  className="w-full bg-black border border-[#1a1a1a] p-3 text-sm rounded-lg focus:border-[#D4AF37] outline-none"
-                />
+                  onDragLeave={() => setIsImageDropActive(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsImageDropActive(false);
+                    const files = Array.from(event.dataTransfer.files || []).filter((file) =>
+                      String(file.type || '').toLowerCase().startsWith('image/')
+                    );
+                    uploadImagesToServer(files);
+                  }}
+                >
+                  <p className="text-xs text-[#888] mb-3">Drag & drop product images here or choose files</p>
+                  <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-2 text-xs font-bold uppercase tracking-widest rounded-lg border border-[#D4AF37]/60 text-[#D4AF37] hover:bg-[#D4AF37]/10">
+                    <UploadCloud size={14} />
+                    {isUploadingImages ? 'Uploading...' : 'Choose Files'}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => {
+                        const files = Array.from(event.target.files || []);
+                        uploadImagesToServer(files);
+                        event.currentTarget.value = '';
+                      }}
+                    />
+                  </label>
+                  {uploadError ? <p className="text-[11px] text-red-400 mt-3">{uploadError}</p> : null}
+                </div>
+
+                {Array.isArray(formData.images) && formData.images.length > 0 ? (
+                  <div className="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {formData.images.map((url, idx) => (
+                      <div key={`${url}-${idx}`} className="relative rounded-lg overflow-hidden border border-[#1a1a1a] bg-black">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Uploaded ${idx + 1}`} className="w-full h-24 object-cover opacity-90" />
+                        <button
+                          type="button"
+                          onClick={() => removeImageFromForm(url)}
+                          className="absolute top-1 right-1 p-1 rounded bg-black/70 text-red-300 hover:text-red-200"
+                          title="Remove image"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                        <div className="px-2 py-1 text-[10px] text-[#888] truncate">{url}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-3 border border-[#1a1a1a] rounded-xl p-4 bg-black/30">

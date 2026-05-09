@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const path = require('path');
 const helmet = require('helmet');
 const mongoSanitize = require('mongo-sanitize');
 const rateLimit = require('express-rate-limit');
@@ -88,6 +89,7 @@ app.get('/health', (req, res) => {
 app.use('/api/webhooks', express.raw({ type: 'application/json', limit: '100kb' }), webhookRoutes);
 app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: false, limit: '100kb' }));
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 const connectDB = async () => {
   try {
