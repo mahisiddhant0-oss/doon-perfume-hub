@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const mongoose = require('mongoose');
 const ProductCategory = require('../models/ProductCategory');
 const Enquiry = require('../models/Enquiry');
 const { syncProductImagesFromWix } = require('../services/wixImageSyncService');
@@ -915,10 +916,36 @@ const uploadAdminProductImages = async (req, res) => {
       return res.status(400).json({ message: 'No image files uploaded' });
     }
 
+    if (mongoose.connection?.readyState !== 1) {
+      return res.status(503).json({ message: 'Database is not connected' });
+    }
+
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'product_media',
+    });
+
+    const uploadFile = (file) =>
+      new Promise((resolve, reject) => {
+        const safeName = String(file.originalname || 'product-image')
+          .replace(/[^\w.\-]/g, '_')
+          .slice(0, 120);
+        const uploadStream = bucket.openUploadStream(safeName, {
+          contentType: String(file.mimetype || 'application/octet-stream'),
+          metadata: {
+            uploadedBy: 'admin',
+            source: 'product-admin-upload',
+          },
+        });
+        uploadStream.on('error', reject);
+        uploadStream.on('finish', () => resolve(uploadStream.id));
+        uploadStream.end(file.buffer);
+      });
+
+    const uploadedIds = await Promise.all(files.map(uploadFile));
     const host = req.get('host');
     const protocol = req.headers['x-forwarded-proto'] ? String(req.headers['x-forwarded-proto']).split(',')[0] : req.protocol;
     const baseUrl = `${protocol}://${host}`;
-    const urls = files.map((file) => `${baseUrl}/uploads/products/${file.filename}`);
+    const urls = uploadedIds.map((id) => `${baseUrl}/api/products/media/${String(id)}`);
 
     return res.status(201).json({
       message: 'Images uploaded successfully',
@@ -929,6 +956,42 @@ const uploadAdminProductImages = async (req, res) => {
       message: 'Image upload failed',
       error: error.message,
     });
+  }
+};
+
+// @desc    Serve product media stored in MongoDB GridFS
+// @route   GET /api/products/media/:id
+// @access  Public
+const getProductMediaById = async (req, res) => {
+  try {
+    if (mongoose.connection?.readyState !== 1) {
+      return res.status(503).json({ message: 'Database is not connected' });
+    }
+
+    const fileId = String(req.params.id || '').trim();
+    if (!mongoose.Types.ObjectId.isValid(fileId)) {
+      return res.status(400).json({ message: 'Invalid media id' });
+    }
+
+    const objectId = new mongoose.Types.ObjectId(fileId);
+    const filesCollection = mongoose.connection.db.collection('product_media.files');
+    const fileDoc = await filesCollection.findOne({ _id: objectId });
+    if (!fileDoc) {
+      return res.status(404).json({ message: 'Media not found' });
+    }
+
+    res.setHeader('Content-Type', fileDoc.contentType || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+      bucketName: 'product_media',
+    });
+    const downloadStream = bucket.openDownloadStream(objectId);
+    downloadStream.on('error', () => {
+      if (!res.headersSent) res.status(404).json({ message: 'Media not found' });
+    });
+    downloadStream.pipe(res);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to fetch media', error: error.message });
   }
 };
 
@@ -1222,6 +1285,7 @@ module.exports = {
   mapEssentialOilImages,
   setStandardVariantWeights,
   uploadAdminProductImages,
+  getProductMediaById,
   syncSelectedEssentialOils250ml,
   repriceAll250mlVariants,
   setFiveKgProductsImage,

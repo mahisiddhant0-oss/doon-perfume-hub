@@ -8,6 +8,7 @@ const {
   deleteProductCategory,
   getProducts,
   getProductById,
+  getProductMediaById,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -30,6 +31,7 @@ const { uploadProductImages } = require('../middlewares/uploadMiddleware');
 // Public routes
 router.route('/categories').get(getProductCategories);
 router.route('/categories/:id').get(getProductCategoryById);
+router.route('/media/:id').get(getProductMediaById);
 router.route('/').get(getProducts);
 router.route('/:id').get(getProductById);
 router.route('/:id/enquiry').post(submitProductEnquiry);
