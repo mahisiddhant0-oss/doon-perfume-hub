@@ -608,6 +608,49 @@ export default function AdminProducts() {
     }
   };
 
+  const uploadVariantImage = async (variantIndex: number, files: File[]) => {
+    if (!files.length) return;
+    setIsUploadingImages(true);
+    setUploadError('');
+    try {
+      const userStr = localStorage.getItem('user');
+      const token = userStr ? JSON.parse(userStr).token : '';
+      if (!token) {
+        throw new Error('Please login as admin to upload images.');
+      }
+
+      const payload = new FormData();
+      files.forEach((file) => payload.append('images', file));
+
+      const res = await fetch(`${API_ROUTES.PRODUCTS}/admin/upload-images`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload,
+      });
+
+      const responsePayload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(responsePayload?.message || 'Image upload failed');
+      }
+
+      const uploadedUrls = Array.isArray(responsePayload?.urls)
+        ? responsePayload.urls.map((entry: unknown) => String(entry || '').trim()).filter(Boolean)
+        : [];
+
+      if (uploadedUrls.length === 0) {
+        throw new Error('Upload completed but no image URLs were returned.');
+      }
+
+      updateVariant(variantIndex, 'image', uploadedUrls[0]);
+    } catch (error: any) {
+      setUploadError(error?.message || 'Image upload failed');
+    } finally {
+      setIsUploadingImages(false);
+    }
+  };
+
   const visibleProducts = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     const categoryTagQuery = query.startsWith('#') ? query.slice(1).trim() : '';
@@ -1362,13 +1405,28 @@ export default function AdminProducts() {
                           onChange={(e) => updateVariant(index, 'weight', Number(e.target.value))}
                           className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
                         />
-                        <input
-                          type="text"
-                          placeholder="Image URL"
-                          value={variant.image}
-                          onChange={(e) => updateVariant(index, 'image', e.target.value)}
-                          className="col-span-2 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
-                        />
+                        <div className="col-span-2 flex gap-1">
+                          <input
+                            type="text"
+                            placeholder="Image URL"
+                            value={variant.image}
+                            onChange={(e) => updateVariant(index, 'image', e.target.value)}
+                            className="flex-1 min-w-0 bg-black border border-[#1a1a1a] p-2 text-xs rounded-lg focus:border-[#D4AF37] outline-none"
+                          />
+                          <label className="inline-flex items-center justify-center px-2 rounded-lg border border-[#D4AF37]/60 text-[#D4AF37] hover:bg-[#D4AF37]/10 cursor-pointer" title="Upload variant image">
+                            <UploadCloud size={12} />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(event) => {
+                                const files = Array.from(event.target.files || []);
+                                uploadVariantImage(index, files);
+                                event.currentTarget.value = '';
+                              }}
+                            />
+                          </label>
+                        </div>
                         <button
                           type="button"
                           onClick={() => removeVariant(index)}
