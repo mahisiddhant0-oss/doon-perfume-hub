@@ -17,6 +17,16 @@ const normalizeWeightKg = (value) => {
 };
 
 const normalizeSku = (value = '') => String(value || '').trim();
+const inferMimeTypeFromFilename = (filename = '') => {
+  const lower = String(filename || '').toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.avif')) return 'image/avif';
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  return 'application/octet-stream';
+};
 const normalizeSearchKeywords = (searchKeywords) => {
   const fromArray = Array.isArray(searchKeywords)
     ? searchKeywords
@@ -934,6 +944,7 @@ const uploadAdminProductImages = async (req, res) => {
           metadata: {
             uploadedBy: 'admin',
             source: 'product-admin-upload',
+            mimeType: String(file.mimetype || ''),
           },
         });
         uploadStream.on('error', reject);
@@ -980,7 +991,11 @@ const getProductMediaById = async (req, res) => {
       return res.status(404).json({ message: 'Media not found' });
     }
 
-    res.setHeader('Content-Type', fileDoc.contentType || 'application/octet-stream');
+    const resolvedMimeType =
+      String(fileDoc.contentType || '').trim() ||
+      String(fileDoc?.metadata?.mimeType || '').trim() ||
+      inferMimeTypeFromFilename(fileDoc.filename || '');
+    res.setHeader('Content-Type', resolvedMimeType);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
       bucketName: 'product_media',
