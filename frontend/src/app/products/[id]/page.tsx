@@ -291,14 +291,14 @@ export default function ProductDetails() {
         const fallbackImage = nextProduct.images?.[0] || DEFAULT_IMAGE;
         setMainImage(fallbackImage);
         if (nextProduct.variants?.length > 0) {
-          const preferredVariant =
-            nextProduct.variants.find(
-              (variant) => normalizeVariantLabel(variant.label) === "100ml" && !isBookNowVariantLabel(variant.label)
-            ) ||
-            nextProduct.variants.find((variant) => !isBookNowVariantLabel(variant.label)) ||
-            nextProduct.variants[0];
-          setSelectedVariant(preferredVariant);
-          setMainImage(preferredVariant.image?.trim() || fallbackImage);
+          // For multi-variant products, keep all variants unselected until user picks one.
+          if (nextProduct.variants.length === 1) {
+            const onlyVariant = nextProduct.variants[0];
+            setSelectedVariant(onlyVariant);
+            setMainImage(onlyVariant.image?.trim() || fallbackImage);
+          } else {
+            setSelectedVariant(null);
+          }
         }
       } catch (err: any) {
         setError(err?.message || "Failed to load product");
@@ -386,12 +386,14 @@ export default function ProductDetails() {
     );
   }
 
+  const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+  const hasVariantSelection = !hasVariants || Boolean(selectedVariant);
   const displayPrice = selectedVariant ? selectedVariant.price : product.price;
-  const isEnquiryOnly = isBookNowVariantLabel(selectedVariant?.label);
+  const isEnquiryOnly = hasVariantSelection && isBookNowVariantLabel(selectedVariant?.label);
   const isOutOfStock = selectedVariant
     ? Number(selectedVariant.stock || 0) <= 0
     : getIsProductOutOfStock(product);
-  const isActionDisabled = isEnquiryOnly ? false : isOutOfStock;
+  const isActionDisabled = !hasVariantSelection || (isEnquiryOnly ? false : isOutOfStock);
   const handleOpenEnquiryModal = () => {
     setEnquiryError("");
     setIsEnquiryModalOpen(true);
@@ -657,7 +659,11 @@ export default function ProductDetails() {
 
             <div className="flex items-center gap-4 mb-6">
               <span className="text-3xl font-medium text-gray-900">
-                {isEnquiryOnly ? "BOOK NOW" : `Rs. ${displayPrice.toLocaleString("en-IN")}`}
+                {!hasVariantSelection
+                  ? "Select a size"
+                  : isEnquiryOnly
+                    ? "BOOK NOW"
+                    : `Rs. ${displayPrice.toLocaleString("en-IN")}`}
               </span>
               <span
                 className={`text-[10px] font-bold px-2 py-1 uppercase tracking-wider ${
@@ -668,7 +674,13 @@ export default function ProductDetails() {
                       : "bg-green-50 text-green-700"
                 }`}
               >
-                {isEnquiryOnly ? "Price Enquiry" : isOutOfStock ? "Out of Stock" : "In Stock"}
+                {!hasVariantSelection
+                  ? "Select Variant"
+                  : isEnquiryOnly
+                    ? "Price Enquiry"
+                    : isOutOfStock
+                      ? "Out of Stock"
+                      : "In Stock"}
               </span>
             </div>
 
@@ -737,7 +749,7 @@ export default function ProductDetails() {
                     }`}
                   >
                     {isActionDisabled ? (
-                      "OUT OF STOCK"
+                      !hasVariantSelection ? "SELECT SIZE" : "OUT OF STOCK"
                     ) : addedToCart ? (
                       <>
                         <CheckCircle2 size={20} /> ADDED TO CART
@@ -838,7 +850,7 @@ export default function ProductDetails() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-4">
           <button
             onClick={isEnquiryOnly ? handleOpenEnquiryModal : handleAddToCart}
-            disabled={isEnquiryOnly ? false : addedToCart || isOutOfStock}
+            disabled={isEnquiryOnly ? !hasVariantSelection : addedToCart || isOutOfStock || !hasVariantSelection}
             className={`flex-1 h-14 font-bold tracking-widest text-sm transition-all ${
               isEnquiryOnly
                 ? "bg-black text-white hover:bg-gray-900"
@@ -849,7 +861,15 @@ export default function ProductDetails() {
                     : "bg-[var(--color-brand-primary)] text-white hover:brightness-95"
             }`}
           >
-            {isEnquiryOnly ? "GET BEST PRICE" : isOutOfStock ? "OUT OF STOCK" : addedToCart ? "ADDED TO CART" : "ADD TO CART"}
+            {!hasVariantSelection
+              ? "SELECT SIZE"
+              : isEnquiryOnly
+                ? "GET BEST PRICE"
+                : isOutOfStock
+                  ? "OUT OF STOCK"
+                  : addedToCart
+                    ? "ADDED TO CART"
+                    : "ADD TO CART"}
           </button>
           {!isEnquiryOnly ? (
             <Link
