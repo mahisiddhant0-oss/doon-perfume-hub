@@ -991,10 +991,13 @@ const getProductMediaById = async (req, res) => {
       return res.status(404).json({ message: 'Media not found' });
     }
 
+    const rawContentType = String(fileDoc.contentType || '').trim().toLowerCase();
+    const metadataMimeType = String(fileDoc?.metadata?.mimeType || '').trim().toLowerCase();
+    const inferredMimeType = inferMimeTypeFromFilename(fileDoc.filename || '');
     const resolvedMimeType =
-      String(fileDoc.contentType || '').trim() ||
-      String(fileDoc?.metadata?.mimeType || '').trim() ||
-      inferMimeTypeFromFilename(fileDoc.filename || '');
+      (rawContentType && rawContentType !== 'application/octet-stream' ? rawContentType : '') ||
+      (metadataMimeType && metadataMimeType !== 'application/octet-stream' ? metadataMimeType : '') ||
+      inferredMimeType;
     res.setHeader('Content-Type', resolvedMimeType);
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
