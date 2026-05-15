@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const ProductCategory = require('../models/ProductCategory');
 const Enquiry = require('../models/Enquiry');
 const { syncProductImagesFromWix } = require('../services/wixImageSyncService');
+const { uploadBufferToWix } = require('../services/wixMediaService');
 const { ensureEssentialOil100mlVariants } = require('../services/essentialOilVariantService');
 const MAX_SEARCH_KEYWORD_LENGTH = 120;
 
@@ -926,41 +927,74 @@ const uploadAdminProductImages = async (req, res) => {
       return res.status(400).json({ message: 'No image files uploaded' });
     }
 
-    if (mongoose.connection?.readyState !== 1) {
-      return res.status(503).json({ message: 'Database is not connected' });
-    }
+    const uploadToWixEnabled = String(process.env.WIX_USE_UPLOAD_API || 'true').toLowerCase() !== 'false';
+    const hasWixApiKey = Boolean(String(process.env.WIX_API_KEY || '').trim());
 
-    const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
-      bucketName: 'product_media',
-    });
+    let urls = [];
+    let storage = 'wix';
 
-    const uploadFile = (file) =>
-      new Promise((resolve, reject) => {
-        const safeName = String(file.originalname || 'product-image')
-          .replace(/[^\w.\-]/g, '_')
-          .slice(0, 120);
-        const uploadStream = bucket.openUploadStream(safeName, {
-          contentType: String(file.mimetype || 'application/octet-stream'),
-          metadata: {
-            uploadedBy: 'admin',
-            source: 'product-admin-upload',
-            mimeType: String(file.mimetype || ''),
-          },
-        });
-        uploadStream.on('error', reject);
-        uploadStream.on('finish', () => resolve(uploadStream.id));
-        uploadStream.end(file.buffer);
+    const uploadUsingGridFs = async () => {
+      if (mongoose.connection?.readyState !== 1) {
+        throw new Error('Database is not connected');
+      }
+
+      const bucket = new mongoose.mongo.GridFSBucket(mongoose.connection.db, {
+        bucketName: 'product_media',
       });
 
-    const uploadedIds = await Promise.all(files.map(uploadFile));
-    const host = req.get('host');
-    const protocol = req.headers['x-forwarded-proto'] ? String(req.headers['x-forwarded-proto']).split(',')[0] : req.protocol;
-    const baseUrl = `${protocol}://${host}`;
-    const urls = uploadedIds.map((id) => `${baseUrl}/api/products/media/${String(id)}`);
+      const uploadFileToGridFs = (file) =>
+        new Promise((resolve, reject) => {
+          const safeName = String(file.originalname || 'product-image')
+            .replace(/[^\w.\-]/g, '_')
+            .slice(0, 120);
+          const uploadStream = bucket.openUploadStream(safeName, {
+            contentType: String(file.mimetype || 'application/octet-stream'),
+            metadata: {
+              uploadedBy: 'admin',
+              source: 'product-admin-upload',
+              mimeType: String(file.mimetype || ''),
+            },
+          });
+          uploadStream.on('error', reject);
+          uploadStream.on('finish', () => resolve(uploadStream.id));
+          uploadStream.end(file.buffer);
+        });
+
+      const uploadedIds = await Promise.all(files.map(uploadFileToGridFs));
+      const host = req.get('host');
+      const protocol = req.headers['x-forwarded-proto'] ? String(req.headers['x-forwarded-proto']).split(',')[0] : req.protocol;
+      const baseUrl = `${protocol}://${host}`;
+      urls = uploadedIds.map((id) => `${baseUrl}/api/products/media/${String(id)}`);
+      storage = 'mongodb-gridfs';
+    };
+
+    if (uploadToWixEnabled && hasWixApiKey) {
+      try {
+        urls = await Promise.all(
+          files.map((file) =>
+            uploadBufferToWix({
+              fileName: file.originalname || 'product-image',
+              mimeType: String(file.mimetype || 'application/octet-stream'),
+              buffer: file.buffer,
+            })
+          )
+        );
+        urls = urls.map((entry) => String(entry || '').trim()).filter(Boolean);
+        if (urls.length === 0) {
+          throw new Error('No Wix image URLs returned');
+        }
+      } catch (wixError) {
+        console.warn('Wix upload failed, falling back to GridFS:', wixError.message);
+        await uploadUsingGridFs();
+      }
+    } else {
+      await uploadUsingGridFs();
+    }
 
     return res.status(201).json({
       message: 'Images uploaded successfully',
       urls,
+      storage,
     });
   } catch (error) {
     return res.status(500).json({

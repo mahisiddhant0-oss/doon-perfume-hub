@@ -47,6 +47,61 @@ const makeAuthVariants = () => {
   ];
 };
 
+const tryExtractUploadedUrl = (payload = {}) => {
+  const directCandidates = [
+    payload?.file?.url,
+    payload?.file?.fileUrl,
+    payload?.file?.mediaUrl,
+    payload?.file?.media?.url,
+    payload?.file?.image?.url,
+    payload?.url,
+    payload?.fileUrl,
+    payload?.mediaUrl,
+    payload?.media?.url,
+    payload?.image?.url,
+  ];
+
+  for (const candidate of directCandidates) {
+    const normalized = toHttpMediaUrl(candidate);
+    if (normalized) return normalized;
+  }
+
+  return '';
+};
+
+const requestWithAuthVariants = async (endpoint, init = {}) => {
+  const authVariants = makeAuthVariants();
+  let lastError = null;
+  const failures = [];
+
+  for (const headers of authVariants) {
+    try {
+      const response = await fetch(endpoint, {
+        ...init,
+        headers: {
+          ...(init.headers || {}),
+          ...headers,
+        },
+      });
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        failures.push(`(${response.status}) ${text || response.statusText}`);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  if (lastError) {
+    throw new Error(lastError.message || 'Wix request failed');
+  }
+  throw new Error(`Wix request failed: ${failures.join(' ; ')}`);
+};
+
 const queryWixFiles = async () => {
   const apiKey = String(process.env.WIX_API_KEY || '').trim();
   if (!apiKey) {
@@ -110,6 +165,88 @@ const queryWixFiles = async () => {
   throw new Error('Unable to query Wix media files');
 };
 
+const uploadBufferToWix = async ({ fileName, mimeType, buffer }) => {
+  const apiKey = String(process.env.WIX_API_KEY || '').trim();
+  if (!apiKey) throw new Error('WIX_API_KEY is not configured');
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('Upload buffer is empty');
+  }
+
+  const safeFileName = String(fileName || `upload-${Date.now()}.bin`)
+    .replace(/[^\w.\-]/g, '_')
+    .slice(0, 120);
+  const safeMimeType = String(mimeType || 'application/octet-stream').trim() || 'application/octet-stream';
+
+  const generatePayloads = [
+    { mimeType: safeMimeType, fileName: safeFileName },
+    { mimeType: safeMimeType, filename: safeFileName },
+    { file: { mimeType: safeMimeType, fileName: safeFileName } },
+  ];
+
+  let uploadUrl = '';
+  let lastGenerateError = null;
+
+  for (const payload of generatePayloads) {
+    try {
+      const generateRes = await requestWithAuthVariants(`${WIX_API_BASE}/site-media/v1/files/generate-upload-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const generateJson = await generateRes.json().catch(() => ({}));
+      uploadUrl =
+        String(generateJson?.uploadUrl || '').trim() ||
+        String(generateJson?.url || '').trim() ||
+        String(generateJson?.upload?.url || '').trim();
+      if (uploadUrl) break;
+    } catch (error) {
+      lastGenerateError = error;
+    }
+  }
+
+  if (!uploadUrl) {
+    throw new Error(lastGenerateError?.message || 'Failed to generate Wix upload URL');
+  }
+
+  const parsedUploadUrl = new URL(uploadUrl);
+  if (!parsedUploadUrl.searchParams.has('filename')) {
+    parsedUploadUrl.searchParams.set('filename', safeFileName);
+  }
+
+  const uploadRes = await fetch(parsedUploadUrl.toString(), {
+    method: 'PUT',
+    headers: {
+      'Content-Type': safeMimeType,
+    },
+    body: buffer,
+  });
+
+  if (!uploadRes.ok) {
+    const text = await uploadRes.text().catch(() => '');
+    throw new Error(`Wix upload failed (${uploadRes.status}): ${text || uploadRes.statusText}`);
+  }
+
+  const uploadJson = await uploadRes.json().catch(() => ({}));
+  const directUrl = tryExtractUploadedUrl(uploadJson);
+  if (directUrl) {
+    return directUrl;
+  }
+
+  // Fallback: search recently uploaded files and match by filename.
+  const files = await queryWixFiles();
+  const normalizedTarget = normalize(safeFileName);
+  const candidate = files
+    .map(extractFileMeta)
+    .filter((item) => item.mediaUrl && normalize(item.name) === normalizedTarget)
+    .pop();
+
+  if (candidate?.mediaUrl) return candidate.mediaUrl;
+  throw new Error('Wix upload succeeded but media URL could not be resolved');
+};
+
 const extractFileMeta = (file = {}) => {
   const name =
     file?.displayName ||
@@ -146,4 +283,5 @@ const extractFileMeta = (file = {}) => {
 module.exports = {
   queryWixFiles,
   extractFileMeta,
+  uploadBufferToWix,
 };
