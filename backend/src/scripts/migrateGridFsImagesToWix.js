@@ -8,6 +8,8 @@ const MONGO_URI = process.env.MONGO_URI || '';
 const GRIDFS_BUCKET = 'product_media';
 const MEDIA_ROUTE_REGEX = /\/api\/products\/media\/([a-f0-9]{24})$/i;
 const shouldDeleteGridFs = process.argv.includes('--delete');
+const limitArg = process.argv.find((arg) => arg.startsWith('--limit='));
+const maxItems = limitArg ? Math.max(1, Number(limitArg.split('=')[1] || 0)) : 0;
 
 const parseMediaIdFromUrl = (url = '') => {
   const value = String(url || '').trim();
@@ -65,12 +67,22 @@ const run = async () => {
     if (id) referencedIds.add(id);
   });
 
+  const allIds = Array.from(referencedIds);
+  const targetIds = maxItems > 0 ? allIds.slice(0, maxItems) : allIds;
+
   const idToWixUrl = new Map();
   const failedIds = [];
 
-  for (const fileId of referencedIds) {
+  console.log(`Starting migration for ${targetIds.length} of ${allIds.length} referenced GridFS files...`);
+  let processed = 0;
+  for (const fileId of targetIds) {
+    processed += 1;
+    console.log(`[${processed}/${targetIds.length}] Processing fileId=${fileId}`);
     const fileDoc = await filesCollection.findOne({ _id: new mongoose.Types.ObjectId(fileId) });
-    if (!fileDoc) continue;
+    if (!fileDoc) {
+      console.log(`  -> skipped (file doc missing)`);
+      continue;
+    }
     try {
       const buffer = await downloadGridFsFile(bucket, fileId);
       const wixUrl = await uploadBufferToWix({
@@ -80,12 +92,14 @@ const run = async () => {
       });
       if (wixUrl) {
         idToWixUrl.set(fileId, wixUrl);
+        console.log(`  -> uploaded to Wix`);
       } else {
         failedIds.push(fileId);
+        console.log(`  -> failed (no URL returned)`);
       }
     } catch (error) {
       failedIds.push(fileId);
-      console.error(`Upload failed for ${fileId}: ${error.message}`);
+      console.error(`  -> upload failed: ${error.message}`);
     }
   }
 
@@ -130,7 +144,7 @@ const run = async () => {
 
   let deletedCount = 0;
   if (shouldDeleteGridFs) {
-    for (const [fileId] of idToWixUrl.entries()) {
+  for (const [fileId] of idToWixUrl.entries()) {
       try {
         await deleteGridFsFile(bucket, fileId);
         deletedCount += 1;
@@ -141,7 +155,8 @@ const run = async () => {
   }
 
   console.log('=== GridFS -> Wix Migration Summary ===');
-  console.log(`Referenced GridFS IDs found: ${referencedIds.size}`);
+  console.log(`Referenced GridFS IDs found: ${allIds.length}`);
+  console.log(`Targeted in this run: ${targetIds.length}`);
   console.log(`Successfully uploaded to Wix: ${idToWixUrl.size}`);
   console.log(`Failed uploads: ${failedIds.length}`);
   console.log(`Products updated: ${productsUpdated}`);
