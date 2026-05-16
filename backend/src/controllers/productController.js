@@ -928,6 +928,7 @@ const uploadAdminProductImages = async (req, res) => {
     }
 
     const uploadToWixEnabled = String(process.env.WIX_USE_UPLOAD_API || 'true').toLowerCase() !== 'false';
+    const wixOnlyUpload = String(process.env.WIX_ONLY_UPLOAD || 'true').toLowerCase() !== 'false';
     const hasWixApiKey = Boolean(String(process.env.WIX_API_KEY || '').trim());
 
     let urls = [];
@@ -984,10 +985,21 @@ const uploadAdminProductImages = async (req, res) => {
           throw new Error('No Wix image URLs returned');
         }
       } catch (wixError) {
+        if (wixOnlyUpload) {
+          return res.status(502).json({
+            message: 'Wix upload failed. Image was not stored.',
+            error: wixError.message,
+          });
+        }
         console.warn('Wix upload failed, falling back to GridFS:', wixError.message);
         await uploadUsingGridFs();
       }
     } else {
+      if (wixOnlyUpload) {
+        return res.status(503).json({
+          message: 'Wix upload is required but not configured.',
+        });
+      }
       await uploadUsingGridFs();
     }
 
