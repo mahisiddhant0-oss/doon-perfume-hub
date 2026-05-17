@@ -15,6 +15,8 @@ interface Product {
   price: number;
   category: string;
   categories?: string[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 type CategoryMeta = {
   _id?: string;
@@ -63,6 +65,18 @@ const normalizeProductName = (value: string) =>
     .replace(/\s+ESSENTIAL\s+OIL$/i, '')
     .replace(/[^A-Z0-9]+/g, ' ')
     .trim();
+
+const getProductTimestamp = (product: Product) => {
+  const created = Date.parse(String(product.createdAt || ''));
+  if (!Number.isNaN(created)) return created;
+  const updated = Date.parse(String(product.updatedAt || ''));
+  if (!Number.isNaN(updated)) return updated;
+  const idPrefix = String(product._id || '').slice(0, 8);
+  if (/^[0-9a-fA-F]{8}$/.test(idPrefix)) {
+    return parseInt(idPrefix, 16) * 1000;
+  }
+  return 0;
+};
 
 export default function Home() {
   const router = useRouter();
@@ -304,8 +318,9 @@ export default function Home() {
         if (!res.ok) throw new Error('API failed');
         const data = await res.json();
         const products = Array.isArray(data) ? data : [];
+        const latestFirst = [...products].sort((a, b) => getProductTimestamp(b) - getProductTimestamp(a));
         setAllProducts(products);
-        setViralLaunches(products.slice(0, 4));
+        setViralLaunches(latestFirst.slice(0, 4));
       } catch (err) {
         console.error('Failed to fetch viral products:', err);
         setAllProducts([]);
