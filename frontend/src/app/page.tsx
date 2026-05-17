@@ -94,7 +94,7 @@ export default function Home() {
       titleAccent: 'Perfumes',
       description:
         'From fresh daytime notes to bold evening blends, discover perfumes made to match every mood and moment.',
-      image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=2000&q=80',
+      image: '/hero-slide-1.png',
       cta: 'SHOP PERFUMES',
       href: '/products?category=perfumes',
     },
