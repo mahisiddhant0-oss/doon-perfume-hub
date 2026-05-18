@@ -156,25 +156,23 @@ const createProductCategory = async (req, res) => {
       return res.status(400).json({ message: 'Category is too long' });
     }
 
-    const doc = await ProductCategory.findOneAndUpdate(
-      { value: rawValue },
-      {
-        $set: {
-          ...(rawName ? { name: rawName } : {}),
-          ...(rawDescription ? { description: rawDescription } : {}),
-          ...(rawImage ? { image: rawImage } : {}),
-        },
-        $setOnInsert: {
-          value: rawValue,
-          name: rawName || formatCategoryName(rawValue),
-          description: rawDescription,
-          image: rawImage,
-        },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    const existing = await ProductCategory.findOne({ value: rawValue });
+    if (existing) {
+      if (rawName) existing.name = rawName;
+      if (rawDescription || rawDescription === '') existing.description = rawDescription;
+      if (rawImage || rawImage === '') existing.image = rawImage;
+      const updated = await existing.save();
+      return res.status(200).json(updated);
+    }
 
-    return res.status(201).json(doc);
+    const created = await ProductCategory.create({
+      value: rawValue,
+      name: rawName || formatCategoryName(rawValue),
+      description: rawDescription,
+      image: rawImage,
+    });
+
+    return res.status(201).json(created);
   } catch (error) {
     if (error?.code === 11000) {
       const value = String(req.body?.value || '').trim().toLowerCase();
